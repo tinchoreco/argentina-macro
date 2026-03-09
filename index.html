@@ -137,6 +137,7 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 <button class="tab" data-tab="tab2">🏦 BCRA</button>
 <button class="tab" data-tab="tab3">📈 Activos</button>
 <button class="tab" data-tab="tab4">🧮 CAPM</button>
+<button class="tab" data-tab="tab5">💵 Dólares</button>
 </div>
 
 <!-- ==================== TAB 1: MERCADO ==================== -->
@@ -287,6 +288,26 @@ Armá tu portafolio agregando tickers. El modelo calcula el rendimiento esperado
 <div class="cc f" style="margin-top:16px"><div class="ch"><span class="ct">Matriz de Correlación</span><span class="ctag">Retornos diarios</span></div><div id="corrMatrix" style="overflow-x:auto"></div></div>
 </div>
 </div>
+<!-- TAB 5: DÓLARES -->
+<div class="tab-content" id="tab5">
+<div class="sec">💵 Entrada de Dólares al Sistema Financiero <span class="sec-tag">Blanqueo & FCI</span></div>
+<div class="kpis" id="dolKpis" style="grid-template-columns:repeat(5,1fr)"></div>
+<div id="dolLoading" class="mini-lo"><div class="spin"></div><p style="margin-top:12px">Cargando datos de depósitos y reservas...</p></div>
+<div id="dolContent" style="display:none">
+<div class="cg">
+<div class="cc f"><div class="ch"><span class="ct">Depósitos en USD — Sector Privado</span><span class="ctag">Millones USD · BCRA</span></div><div class="cb t"><canvas id="cDepUsd"></canvas></div></div>
+</div>
+<div class="cg">
+<div class="cc"><div class="ch"><span class="ct">Reservas vs Depósitos USD</span><span class="ctag">Millones USD</span></div><div class="cb t"><canvas id="cResVsDep"></canvas></div></div>
+<div class="cc"><div class="ch"><span class="ct">Préstamos en USD</span><span class="ctag">Millones USD · BCRA</span></div><div class="cb t"><canvas id="cPrestUsd"></canvas></div></div>
+</div>
+<div class="sec">📊 FCI en Dólares <span class="sec-tag">ArgentinaDatos · Renta Fija</span></div>
+<div class="kpis" id="fciDolKpis" style="grid-template-columns:repeat(3,1fr)"></div>
+<div class="cc f" style="margin-top:12px"><div class="ch"><span class="ct">Top 15 FCI en Dólares por Patrimonio</span><span class="ctag">ARS</span></div><div class="cb t"><canvas id="cFciDol"></canvas></div></div>
+<div class="sec">📋 Detalle FCI Dolarizados <span class="sec-tag" id="fciDolCount">0</span></div>
+<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fondo</th><th>Patrimonio</th></tr></thead><tbody id="fciDolBody"></tbody></table></div>
+</div>
+</div>
 <footer class="footer">
 <p>Datos: <a href="https://argentinadatos.com" target="_blank">ArgentinaDatos API</a> · <a href="https://www.bcra.gob.ar/apis-banco-central/" target="_blank">BCRA API</a> — Fuentes: BCRA, INDEC, CAFCI, JP Morgan, Ámbito</p>
 <p style="margin-top:6px">Dashboard generado para fines educativos — Curso Power BI</p>
@@ -337,6 +358,7 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
   document.querySelectorAll('.tab-content').forEach(x=>x.classList.remove('active'));
   t.classList.add('active');document.getElementById(t.dataset.tab).classList.add('active');
   if(t.dataset.tab==='tab2'&&!bcraLoaded)loadBCRA();
+  if(t.dataset.tab==='tab5'&&!dolLoaded)loadDolares();
 }));
 
 // === TAB 1: MERCADO ===
@@ -493,15 +515,33 @@ document.getElementById('bcraPlot').addEventListener('click',async()=>{
   }catch(e){alert('Error: '+e.message)}
 });
 
-// === TAB 3: ACTIVOS (Yahoo Finance) ===
+// === TAB 3: ACTIVOS (Yahoo Finance + API Server local) ===
 let cTicker;
 const YF_CHART='https://query2.finance.yahoo.com/v8/finance/chart/';
 const YF_QUOTE='https://query2.finance.yahoo.com/v10/finance/quoteSummary/';
+const LOCAL_API='http://localhost:5050/api';
+const RENDER_API='https://argentina-macro-api.onrender.com/api'; // Cambiar por tu URL de Render
+let apiServerAvailable=null; // null=unknown, true/false
+let apiBaseUrl=null;
+
+async function checkApiServer(){
+  // Try local first, then Render
+  for(const base of[LOCAL_API,RENDER_API]){
+    try{const r=await fetch(base+'/health',{signal:AbortSignal.timeout(3000)});if(r.ok){apiServerAvailable=true;apiBaseUrl=base;console.log('API server encontrado:',base);return true}}catch(e){}
+  }
+  apiServerAvailable=false;return false;
+}
+checkApiServer();
+
 async function fetchYF(url){
-  // Try via CORS proxies (Yahoo blocks direct browser requests)
   for(let p=0;p<PROXIES.length;p++){try{const r=await fetch(PROXIES[p](url));if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}catch(e){continue}}
   throw new Error('No se pudo conectar a Yahoo Finance');
 }
+
+async function fetchLocal(endpoint){
+  const r=await fetch(apiBaseUrl+endpoint);if(!r.ok)throw new Error('API HTTP '+r.status);return await r.json();
+}
+
 async function searchTicker(){
   const raw=document.getElementById('tickerInput').value.trim().toUpperCase();if(!raw)return;
   const ticker=raw;
@@ -510,7 +550,32 @@ async function searchTicker(){
   document.getElementById('tickerResult').style.display='none';
   document.getElementById('tickerError').style.display='none';
   try{
-    // 1) Chart data (prices)
+    // Try local API server first (richer data via yfinance)
+    if(apiServerAvailable===null)await checkApiServer();
+    if(apiServerAvailable){
+      try{
+        const data=await fetchLocal('/ticker/'+encodeURIComponent(ticker)+'?period='+range);
+        if(data.error)throw new Error(data.error);
+        document.getElementById('tickerLoading').style.display='none';
+        document.getElementById('tickerResult').style.display='block';
+        const hist=data.history||[];
+        const closes=hist.map(h=>h.close);const highs=hist.map(h=>h.high);const lows=hist.map(h=>h.low);const volumes=hist.map(h=>h.volume);
+        const ts=hist.map(h=>new Date(h.date).getTime()/1000);
+        const f=data.fundamentals||{};
+        const meta={shortName:f.shortName||f.symbol||ticker,symbol:f.symbol||ticker,currency:f.currency||'ARS',regularMarketPrice:f.currentPrice||closes[closes.length-1],chartPreviousClose:f.previousClose||closes[0]};
+        renderTickerChart(ticker,meta,ts,closes,range);
+        renderTickerKpis(ticker,meta,closes,highs,lows,volumes);
+        // Build fundamentals in quoteSummary format for renderer
+        const fund={financialData:{ebitda:f.ebitda,totalRevenue:f.totalRevenue,profitMargins:f.profitMargins,freeCashflow:f.freeCashflow,debtToEquity:f.debtToEquity,returnOnEquity:f.returnOnEquity,targetMeanPrice:f.targetMeanPrice},summaryDetail:{trailingPE:f.trailingPE,trailingEps:f.trailingEps,dividendYield:f.dividendYield},defaultKeyStatistics:{beta:f.beta},price:{marketCap:f.marketCap}};
+        renderTickerFundamentals(fund,meta);
+        const divs=(data.dividends||[]).map(d=>({date:new Date(d.date).getTime()/1000,amount:d.amount}));
+        renderTickerDividends(divs);
+        // Show API server badge
+        document.getElementById('tickerChartTag').textContent=(meta.currency||'')+' · '+range+' · 🐍 API';
+        return;
+      }catch(e){console.warn('API server falló, cayendo a Yahoo directo:',e);apiServerAvailable=false}
+    }
+    // Fallback: Yahoo Finance direct via CORS proxy
     const chartUrl=YF_CHART+encodeURIComponent(ticker)+'?range='+range+'&interval=1d&events=div';
     const chartData=await fetchYF(chartUrl);
     if(!chartData.chart||!chartData.chart.result||!chartData.chart.result[0])throw new Error('Ticker no encontrado: '+ticker);
@@ -802,9 +867,124 @@ function renderCorrMatrix(assets){
   html+='</tbody></table>';c.innerHTML=html;
 }
 
+// === TAB 5: DÓLARES ===
+let dolLoaded=false;let cDepUsd,cResVsDep,cPrestUsd,cFciDol;
+async function loadDolares(){
+  if(dolLoaded)return;
+  try{
+    // Fetch BCRA series in parallel
+    const [dep108,dep107,prest125,res1]=await Promise.all([
+      fetchBCRA('/Monetarias/108?desde=2023-01-01&hasta=2026-01-01&limit=3000').catch(e=>null),
+      fetchBCRA('/Monetarias/107?desde=2023-01-01&hasta=2026-01-01&limit=3000').catch(e=>null),
+      fetchBCRA('/Monetarias/125?desde=2023-01-01&hasta=2026-01-01&limit=3000').catch(e=>null),
+      fetchBCRA('/Monetarias/1?desde=2023-01-01&hasta=2026-01-01&limit=3000').catch(e=>null),
+    ]);
+    // Extract detalle arrays
+    function getDet(d){if(!d)return[];const r=d.results||d;if(Array.isArray(r)&&r[0]&&r[0].detalle)return r[0].detalle;return r}
+    const dDep108=getDet(dep108).reverse();
+    const dDep107=getDet(dep107).reverse();
+    const dPrest=getDet(prest125).reverse();
+    const dRes=getDet(res1).reverse();
+    // FCI dolarizados
+    let fciDol=[];
+    try{
+      const fciData=await fetchAPI('/finanzas/fci/rentaFija/ultimo/');
+      const fondos=fciData.filter(d=>d.fondo&&!d.fondo.startsWith('Region:')&&!d.fondo.startsWith('Duration:')&&!d.fondo.startsWith('Horizon'));
+      fciDol=fondos.filter(d=>{const n=(d.fondo||'').toLowerCase();return['dolar','dollar','usd','latam','global','corporate'].some(k=>n.includes(k))&&d.patrimonio&&d.patrimonio>0});
+    }catch(e){console.warn('FCI dol:',e)}
+    dolLoaded=true;
+    document.getElementById('dolLoading').style.display='none';
+    document.getElementById('dolContent').style.display='block';
+    renderDolKpis(dDep108,dDep107,dPrest,dRes,fciDol);
+    renderDepChart(dDep108);
+    renderResVsDep(dRes,dDep108);
+    renderPrestChart(dPrest);
+    renderFciDol(fciDol);
+  }catch(e){
+    document.getElementById('dolLoading').innerHTML='<p style="color:var(--rose)">Error: '+e.message+'</p>';
+    console.error(e);
+  }
+}
+function renderDolKpis(dep108,dep107,prest,res,fciDol){
+  const kC=document.getElementById('dolKpis');kC.innerHTML='';
+  const last108=dep108.length?dep108[dep108.length-1]:null;
+  const last107=dep107.length?dep107[dep107.length-1]:null;
+  const lastPrest=prest.length?prest[prest.length-1]:null;
+  const lastRes=res.length?res[res.length-1]:null;
+  const fciTotal=fciDol.reduce((s,f)=>s+(f.patrimonio||0),0);
+  // Find pre-blanqueo value (Aug 2024)
+  const preBlanq=dep108.find(d=>d.fecha==='2024-08-30')||dep108.find(d=>d.fecha&&d.fecha.startsWith('2024-08'));
+  const peak=dep108.reduce((max,d)=>d.valor>max.valor?d:max,{valor:0,fecha:''});
+  const items=[
+    {em:'🏦',lb:'Depósitos USD Privados',val:last108?'US$ '+(last108.valor/1000).toFixed(1)+'B':'—',sub:last108?last108.fecha:'',c:'s',badge:preBlanq?'+'+(last108.valor-preBlanq.valor).toLocaleString('es-AR')+' vs ago-24':'',bc:'up'},
+    {em:'💰',lb:'Dep. USD Total (Pub+Priv)',val:last107?'US$ '+(last107.valor/1000).toFixed(1)+'B':'—',sub:last107?last107.fecha:'',c:'e'},
+    {em:'💳',lb:'Préstamos en USD',val:lastPrest?'US$ '+(lastPrest.valor/1000).toFixed(1)+'B':'—',sub:lastPrest?lastPrest.fecha:'',c:'a'},
+    {em:'🛡️',lb:'Reservas Internacionales',val:lastRes?'US$ '+(lastRes.valor/1000).toFixed(1)+'B':'—',sub:lastRes?lastRes.fecha:'',c:'v'},
+    {em:'📊',lb:'FCI Dolarizados',val:fciDol.length+' fondos',sub:fciTotal>=1e12?'$'+(fciTotal/1e12).toFixed(1)+'T patrimonio':fciTotal>=1e9?'$'+(fciTotal/1e9).toFixed(0)+'B patrimonio':'$'+fciTotal.toLocaleString('es-AR'),c:'o'},
+  ];
+  items.forEach((it,i)=>{
+    const d=document.createElement('div');d.className='kpi '+it.c;d.style.animationDelay=(.04*i)+'s';
+    d.innerHTML='<div class="kpi-top"><span class="kpi-em">'+it.em+'</span>'+(it.badge?'<span class="badge '+(it.bc||'n')+'">'+it.badge+'</span>':'')+'</div><div class="kpi-lb">'+it.lb+'</div><div class="kpi-val">'+it.val+'</div><div class="kpi-sub">'+it.sub+'</div>';
+    kC.appendChild(d);
+  });
+}
+function renderDepChart(data){
+  if(!data.length)return;
+  // Sample monthly for readability
+  const monthly={};data.forEach(d=>{const m=d.fecha.substring(0,7);if(!monthly[m]||d.fecha>monthly[m].fecha)monthly[m]=d});
+  const pts=Object.values(monthly).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  if(cDepUsd)cDepUsd.destroy();
+  cDepUsd=new Chart(document.getElementById('cDepUsd'),{type:'line',data:{labels:pts.map(d=>d.fecha),datasets:[{data:pts.map(d=>d.valor),borderColor:'rgba(56,189,248,.9)',backgroundColor:c=>{const g=c.chart.ctx.createLinearGradient(0,0,0,300);g.addColorStop(0,'rgba(56,189,248,.2)');g.addColorStop(1,'rgba(56,189,248,0)');return g},fill:true,tension:.3,pointRadius:2,borderWidth:2.5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...tt,callbacks:{label:c=>'US$ '+c.parsed.y.toLocaleString('es-AR')+' M'}},annotation:{}},scales:{y:{ticks:{callback:v=>'US$'+(v/1000).toFixed(0)+'B'},grid:{color:'rgba(30,45,74,.3)'}},x:{grid:{display:false},ticks:{maxTicksLimit:12,font:{size:10}}}},interaction:{intersect:false,mode:'index'}}});
+}
+function renderResVsDep(res,dep){
+  if(!res.length||!dep.length)return;
+  // Monthly samples aligned
+  const mRes={};res.forEach(d=>{const m=d.fecha.substring(0,7);if(!mRes[m]||d.fecha>mRes[m].fecha)mRes[m]=d});
+  const mDep={};dep.forEach(d=>{const m=d.fecha.substring(0,7);if(!mDep[m]||d.fecha>mDep[m].fecha)mDep[m]=d});
+  const months=Object.keys(mRes).filter(m=>mDep[m]).sort();
+  if(cResVsDep)cResVsDep.destroy();
+  cResVsDep=new Chart(document.getElementById('cResVsDep'),{type:'line',data:{labels:months,datasets:[
+    {label:'Reservas',data:months.map(m=>mRes[m].valor),borderColor:'rgba(52,211,153,.9)',backgroundColor:'rgba(52,211,153,.08)',fill:true,tension:.3,pointRadius:2,borderWidth:2},
+    {label:'Dep. USD Priv.',data:months.map(m=>mDep[m].valor),borderColor:'rgba(56,189,248,.9)',backgroundColor:'rgba(56,189,248,.08)',fill:true,tension:.3,pointRadius:2,borderWidth:2}
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8a95ab',usePointStyle:true}},tooltip:{...tt,callbacks:{label:c=>c.dataset.label+': US$ '+c.parsed.y.toLocaleString('es-AR')+' M'}}},scales:{y:{ticks:{callback:v=>'US$'+(v/1000).toFixed(0)+'B'},grid:{color:'rgba(30,45,74,.3)'}},x:{grid:{display:false},ticks:{maxTicksLimit:10,font:{size:10}}}},interaction:{intersect:false,mode:'index'}}});
+}
+function renderPrestChart(data){
+  if(!data.length)return;
+  const monthly={};data.forEach(d=>{const m=d.fecha.substring(0,7);if(!monthly[m]||d.fecha>monthly[m].fecha)monthly[m]=d});
+  const pts=Object.values(monthly).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  if(cPrestUsd)cPrestUsd.destroy();
+  cPrestUsd=new Chart(document.getElementById('cPrestUsd'),{type:'bar',data:{labels:pts.map(d=>d.fecha),datasets:[{data:pts.map(d=>d.valor),backgroundColor:'rgba(251,191,36,.6)',borderRadius:3,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...tt,callbacks:{label:c=>'US$ '+c.parsed.y.toLocaleString('es-AR')+' M'}}},scales:{y:{ticks:{callback:v=>'US$'+(v/1000).toFixed(0)+'B'},grid:{color:'rgba(30,45,74,.3)'}},x:{grid:{display:false},ticks:{maxTicksLimit:10,font:{size:10}}}}}});
+}
+function renderFciDol(data){
+  if(!data.length)return;
+  // KPIs
+  const kC=document.getElementById('fciDolKpis');kC.innerHTML='';
+  const totalPat=data.reduce((s,f)=>s+(f.patrimonio||0),0);
+  const top1=data.sort((a,b)=>(b.patrimonio||0)-(a.patrimonio||0))[0];
+  const blanqueo=data.filter(f=>(f.fondo||'').includes('27.743'));
+  [{em:'💰',lb:'Patrimonio Total FCI USD',val:totalPat>=1e12?'$'+(totalPat/1e12).toFixed(2)+'T':'$'+(totalPat/1e9).toFixed(0)+'B',sub:data.length+' fondos/clases',c:'s'},
+   {em:'🏆',lb:'Mayor Fondo',val:top1?top1.fondo.substring(0,30):'—',sub:top1?'$'+(top1.patrimonio/1e9).toFixed(1)+'B':'',c:'e'},
+   {em:'📋',lb:'FCI Ley 27.743 (Blanqueo)',val:blanqueo.length+' clases',sub:'Fondos específicos para blanqueo',c:'a'},
+  ].forEach((it,i)=>{const d=document.createElement('div');d.className='kpi '+it.c;d.innerHTML='<div class="kpi-top"><span class="kpi-em">'+it.em+'</span></div><div class="kpi-lb">'+it.lb+'</div><div class="kpi-val">'+it.val+'</div><div class="kpi-sub">'+it.sub+'</div>';kC.appendChild(d)});
+  // Top 15 chart
+  const top15=data.sort((a,b)=>(b.patrimonio||0)-(a.patrimonio||0)).slice(0,15);
+  if(cFciDol)cFciDol.destroy();
+  cFciDol=new Chart(document.getElementById('cFciDol'),{type:'bar',data:{labels:top15.map(f=>f.fondo?f.fondo.substring(0,30):''),datasets:[{data:top15.map(f=>f.patrimonio||0),backgroundColor:top15.map(f=>(f.fondo||'').includes('27.743')?'rgba(251,191,36,.7)':'rgba(56,189,248,.6)'),borderRadius:4,borderSkipped:false}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...tt,callbacks:{label:c=>'$'+c.parsed.x.toLocaleString('es-AR')}}},scales:{x:{ticks:{callback:v=>v>=1e12?'$'+(v/1e12).toFixed(1)+'T':v>=1e9?'$'+(v/1e9).toFixed(0)+'B':'$'+(v/1e6).toFixed(0)+'M'},grid:{color:'rgba(30,45,74,.3)'}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
+  // Table
+  document.getElementById('fciDolCount').textContent=data.length+' fondos/clases';
+  const tb=document.getElementById('fciDolBody');
+  tb.innerHTML=data.sort((a,b)=>(b.patrimonio||0)-(a.patrimonio||0)).slice(0,30).map(f=>{
+    const isBlanq=(f.fondo||'').includes('27.743');
+    const pat=f.patrimonio||0;
+    const patStr=pat>=1e9?'$'+(pat/1e9).toFixed(2)+'B':pat>=1e6?'$'+(pat/1e6).toFixed(1)+'M':'$'+pat.toLocaleString('es-AR');
+    return'<tr><td'+(isBlanq?' style="color:var(--amb)"':'')+'>'+f.fondo+(isBlanq?' 🏷️':'')+'</td><td class="mono acc">'+patStr+'</td></tr>'
+  }).join('');
+}
+
 // === INIT ===
 document.getElementById('btnR').addEventListener('click',()=>{bcraLoaded=false;loadTab1();if(document.getElementById('tab2').classList.contains('active'))loadBCRA()});
 loadTab1();
 </script>
 </body>
 </html>
+
