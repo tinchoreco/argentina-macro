@@ -873,11 +873,12 @@ async function loadDolares(){
   if(dolLoaded)return;
   try{
     // Fetch BCRA series in parallel
+    const hoy=new Date().toISOString().split('T')[0];
     const [dep108,dep107,prest125,res1]=await Promise.all([
-      fetchBCRA('/Monetarias/108?desde=2023-01-01&hasta=2026-01-01&limit=3000').catch(e=>null),
-      fetchBCRA('/Monetarias/107?desde=2023-01-01&hasta=2026-01-01&limit=3000').catch(e=>null),
-      fetchBCRA('/Monetarias/125?desde=2023-01-01&hasta=2026-01-01&limit=3000').catch(e=>null),
-      fetchBCRA('/Monetarias/1?desde=2023-01-01&hasta=2026-01-01&limit=3000').catch(e=>null),
+      fetchBCRA('/Monetarias/108?desde=2023-01-01&hasta='+hoy+'&limit=3000').catch(e=>null),
+      fetchBCRA('/Monetarias/107?desde=2023-01-01&hasta='+hoy+'&limit=3000').catch(e=>null),
+      fetchBCRA('/Monetarias/125?desde=2023-01-01&hasta='+hoy+'&limit=3000').catch(e=>null),
+      fetchBCRA('/Monetarias/1?desde=2023-01-01&hasta='+hoy+'&limit=3000').catch(e=>null),
     ]);
     // Extract detalle arrays
     function getDet(d){if(!d)return[];const r=d.results||d;if(Array.isArray(r)&&r[0]&&r[0].detalle)return r[0].detalle;return r}
@@ -889,7 +890,7 @@ async function loadDolares(){
     let fciDol=[];
     try{
       const fciData=await fetchAPI('/finanzas/fci/rentaFija/ultimo/');
-      const fondos=fciData.filter(d=>d.fondo&&!d.fondo.startsWith('Region:')&&!d.fondo.startsWith('Duration:')&&!d.fondo.startsWith('Horizon'));
+      const fondos=fciData.filter(d=>d.fondo&&!d.fondo.startsWith('Region:')&&!d.fondo.startsWith('Duration:')&&!d.fondo.startsWith('Horizon')&&!d.fondo.startsWith('Moneda:'));
       fciDol=fondos.filter(d=>{const n=(d.fondo||'').toLowerCase();return['dolar','dollar','usd','latam','global','corporate'].some(k=>n.includes(k))&&d.patrimonio&&d.patrimonio>0});
     }catch(e){console.warn('FCI dol:',e)}
     dolLoaded=true;
@@ -920,7 +921,7 @@ function renderDolKpis(dep108,dep107,prest,res,fciDol){
     {em:'💰',lb:'Dep. USD Total (Pub+Priv)',val:last107?'US$ '+(last107.valor/1000).toFixed(1)+'B':'—',sub:last107?last107.fecha:'',c:'e'},
     {em:'💳',lb:'Préstamos en USD',val:lastPrest?'US$ '+(lastPrest.valor/1000).toFixed(1)+'B':'—',sub:lastPrest?lastPrest.fecha:'',c:'a'},
     {em:'🛡️',lb:'Reservas Internacionales',val:lastRes?'US$ '+(lastRes.valor/1000).toFixed(1)+'B':'—',sub:lastRes?lastRes.fecha:'',c:'v'},
-    {em:'📊',lb:'FCI Dolarizados',val:fciDol.length+' fondos',sub:fciTotal>=1e12?'$'+(fciTotal/1e12).toFixed(1)+'T patrimonio':fciTotal>=1e9?'$'+(fciTotal/1e9).toFixed(0)+'B patrimonio':'$'+fciTotal.toLocaleString('es-AR'),c:'o'},
+    {em:'📊',lb:'FCI Dolarizados',val:fciDol.length+' fondos',sub:'~US$ '+(fciTotal/1400/1e6).toFixed(0)+'M patrimonio',c:'o'},
   ];
   items.forEach((it,i)=>{
     const d=document.createElement('div');d.className='kpi '+it.c;d.style.animationDelay=(.04*i)+'s';
@@ -957,27 +958,31 @@ function renderPrestChart(data){
 }
 function renderFciDol(data){
   if(!data.length)return;
+  // Estimate TC from dolar oficial if available, fallback 1400
+  const tcEl=document.getElementById('kOV');const tcText=tcEl?tcEl.textContent.replace(/[^0-9.,]/g,'').replace('.','').replace(',','.'):'';
+  const tc=parseFloat(tcText)||1400;
   // KPIs
   const kC=document.getElementById('fciDolKpis');kC.innerHTML='';
   const totalPat=data.reduce((s,f)=>s+(f.patrimonio||0),0);
+  const totalUsd=totalPat/tc;
   const top1=data.sort((a,b)=>(b.patrimonio||0)-(a.patrimonio||0))[0];
   const blanqueo=data.filter(f=>(f.fondo||'').includes('27.743'));
-  [{em:'💰',lb:'Patrimonio Total FCI USD',val:totalPat>=1e12?'$'+(totalPat/1e12).toFixed(2)+'T':'$'+(totalPat/1e9).toFixed(0)+'B',sub:data.length+' fondos/clases',c:'s'},
-   {em:'🏆',lb:'Mayor Fondo',val:top1?top1.fondo.substring(0,30):'—',sub:top1?'$'+(top1.patrimonio/1e9).toFixed(1)+'B':'',c:'e'},
+  [{em:'💰',lb:'Patrimonio FCI USD',val:'US$ '+(totalUsd/1e6).toFixed(0)+'M',sub:data.length+' fondos/clases · TC: $'+tc.toFixed(0),c:'s'},
+   {em:'🏆',lb:'Mayor Fondo',val:top1?top1.fondo.substring(0,30):'—',sub:top1?'US$ '+((top1.patrimonio/tc)/1e6).toFixed(0)+'M':'',c:'e'},
    {em:'📋',lb:'FCI Ley 27.743 (Blanqueo)',val:blanqueo.length+' clases',sub:'Fondos específicos para blanqueo',c:'a'},
   ].forEach((it,i)=>{const d=document.createElement('div');d.className='kpi '+it.c;d.innerHTML='<div class="kpi-top"><span class="kpi-em">'+it.em+'</span></div><div class="kpi-lb">'+it.lb+'</div><div class="kpi-val">'+it.val+'</div><div class="kpi-sub">'+it.sub+'</div>';kC.appendChild(d)});
-  // Top 15 chart
+  // Top 15 chart (show in USD millions)
   const top15=data.sort((a,b)=>(b.patrimonio||0)-(a.patrimonio||0)).slice(0,15);
   if(cFciDol)cFciDol.destroy();
-  cFciDol=new Chart(document.getElementById('cFciDol'),{type:'bar',data:{labels:top15.map(f=>f.fondo?f.fondo.substring(0,30):''),datasets:[{data:top15.map(f=>f.patrimonio||0),backgroundColor:top15.map(f=>(f.fondo||'').includes('27.743')?'rgba(251,191,36,.7)':'rgba(56,189,248,.6)'),borderRadius:4,borderSkipped:false}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...tt,callbacks:{label:c=>'$'+c.parsed.x.toLocaleString('es-AR')}}},scales:{x:{ticks:{callback:v=>v>=1e12?'$'+(v/1e12).toFixed(1)+'T':v>=1e9?'$'+(v/1e9).toFixed(0)+'B':'$'+(v/1e6).toFixed(0)+'M'},grid:{color:'rgba(30,45,74,.3)'}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
+  cFciDol=new Chart(document.getElementById('cFciDol'),{type:'bar',data:{labels:top15.map(f=>f.fondo?f.fondo.substring(0,30):''),datasets:[{data:top15.map(f=>(f.patrimonio||0)/tc),backgroundColor:top15.map(f=>(f.fondo||'').includes('27.743')?'rgba(251,191,36,.7)':'rgba(56,189,248,.6)'),borderRadius:4,borderSkipped:false}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...tt,callbacks:{label:c=>'US$ '+(c.parsed.x/1e6).toFixed(1)+'M'}}},scales:{x:{ticks:{callback:v=>'US$'+(v/1e6).toFixed(0)+'M'},grid:{color:'rgba(30,45,74,.3)'}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
   // Table
   document.getElementById('fciDolCount').textContent=data.length+' fondos/clases';
   const tb=document.getElementById('fciDolBody');
   tb.innerHTML=data.sort((a,b)=>(b.patrimonio||0)-(a.patrimonio||0)).slice(0,30).map(f=>{
     const isBlanq=(f.fondo||'').includes('27.743');
-    const pat=f.patrimonio||0;
-    const patStr=pat>=1e9?'$'+(pat/1e9).toFixed(2)+'B':pat>=1e6?'$'+(pat/1e6).toFixed(1)+'M':'$'+pat.toLocaleString('es-AR');
-    return'<tr><td'+(isBlanq?' style="color:var(--amb)"':'')+'>'+f.fondo+(isBlanq?' 🏷️':'')+'</td><td class="mono acc">'+patStr+'</td></tr>'
+    const usd=(f.patrimonio||0)/tc;
+    const usdStr=usd>=1e6?'US$ '+(usd/1e6).toFixed(1)+'M':usd>=1e3?'US$ '+(usd/1e3).toFixed(0)+'K':'US$ '+usd.toFixed(0);
+    return'<tr><td'+(isBlanq?' style="color:var(--amb)"':'')+'>'+f.fondo+(isBlanq?' 🏷️':'')+'</td><td class="mono acc">'+usdStr+'</td></tr>'
   }).join('');
 }
 
