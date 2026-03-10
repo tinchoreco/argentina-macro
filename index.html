@@ -910,14 +910,18 @@ function renderDolKpis(dep108,dep107,prest,res,fciTotals){
   const last108=dep108.length?dep108[dep108.length-1]:null;
   const lastRes=res.length?res[res.length-1]:null;
   const tc=parseFloat((document.getElementById('kOV').textContent||'').replace(/[^0-9.,]/g,'').replace('.','').replace(',','.'))||1400;
-  const rfUsd=(fciTotals.rfUsd+fciTotals.rfBill)/tc;
+  // FCI patrimonio: viene en ARS, convertir a USD
+  // rfUsd en unidades de USD después de dividir por TC
+  const rfUsdVal=(fciTotals.rfUsd+fciTotals.rfBill);
+  // Format: si > 1000 mostrar como X.XXX M (millones)
+  function fmtUsdM(v){if(v>=1e9)return'US$ '+(v/1e9).toFixed(1)+' B';if(v>=1e6)return'US$ '+(v/1e6).toFixed(0)+' M';if(v>=1e3)return'US$ '+(v/1e3).toFixed(0)+' K';return'US$ '+v.toFixed(0)}
   // Find pre-blanqueo value (Aug 2024)
   const preBlanq=dep108.find(d=>d.fecha==='2024-08-30')||dep108.find(d=>d.fecha&&d.fecha.startsWith('2024-08'));
   // Total dólares en sistema = depósitos + FCI RF
-  const totalSistema=(last108?last108.valor:0)+(rfUsd/1e6);
+  const totalSistema=(last108?last108.valor:0)+rfUsd;
   const items=[
     {em:'🏦',lb:'Depósitos USD Privados',val:last108?'US$ '+last108.valor.toLocaleString('es-AR')+' M':'—',sub:last108?last108.fecha+(preBlanq?' · <span class="up">+'+(last108.valor-preBlanq.valor).toLocaleString('es-AR')+' vs ago-24</span>':''):'',c:'s'},
-    {em:'📊',lb:'FCI Renta Fija USD',val:'US$ '+(rfUsd/1e6).toFixed(0)+' M',sub:'Bonos corporativos y soberanos en USD',c:'e'},
+    {em:'📊',lb:'FCI Renta Fija USD',val:fmtUsdM(rfUsdVal),sub:'Bonos corporativos y soberanos en USD',c:'e'},
     {em:'🛡️',lb:'Reservas Internacionales',val:lastRes?'US$ '+lastRes.valor.toLocaleString('es-AR')+' M':'—',sub:lastRes?lastRes.fecha:'',c:'v'},
   ];
   items.forEach((it,i)=>{
@@ -952,20 +956,21 @@ function renderFciDol(data,totals){
   const tc=parseFloat(tcText)||1400;
   // KPIs with aggregate totals
   const kC=document.getElementById('fciDolKpis');kC.innerHTML='';
-  const rfUsd=(totals.rfUsd+totals.rfBill)/tc;
-  const rvUsd=(totals.rvUsd+totals.rvBill)/tc;
-  const rmUsd=(totals.rmUsd+totals.rmBill)/tc;
+  const rfUsd=(totals.rfUsd+totals.rfBill);
+  const rvUsd=(totals.rvUsd+totals.rvBill);
+  const rmUsd=(totals.rmUsd+totals.rmBill);
   const totalUsd=rfUsd+rvUsd+rmUsd;
+  function fmtU(v){if(v>=1e9)return'US$ '+(v/1e9).toFixed(1)+'B';if(v>=1e6)return'US$ '+(v/1e6).toFixed(0)+'M';if(v>=1e3)return'US$ '+(v/1e3).toFixed(0)+'K';return'US$ '+v.toFixed(0)}
   const blanqueo=data.filter(f=>(f.fondo||'').includes('27.743'));
-  [{em:'💰',lb:'FCI USD Total',val:'US$ '+(totalUsd/1e6).toFixed(0)+'M',sub:'RF: US$'+(rfUsd/1e6).toFixed(0)+'M · RV: US$'+(rvUsd/1e6).toFixed(0)+'M · Mix: US$'+(rmUsd/1e6).toFixed(0)+'M',c:'s'},
-   {em:'🏦',lb:'FCI Renta Fija USD',val:'US$ '+(rfUsd/1e6).toFixed(0)+'M',sub:'Bonos corporativos y soberanos en USD',c:'e'},
+  [{em:'💰',lb:'FCI USD Total',val:fmtU(totalUsd),sub:'RF: '+fmtU(rfUsd)+' · RV: '+fmtU(rvUsd)+' · Mix: '+fmtU(rmUsd),c:'s'},
+   {em:'🏦',lb:'FCI Renta Fija USD',val:fmtU(rfUsd),sub:'Bonos corporativos y soberanos en USD',c:'e'},
    {em:'📋',lb:'FCI Ley 27.743 (Blanqueo)',val:blanqueo.length+' clases',sub:'Fondos específicos para blanqueo',c:'a'},
   ].forEach((it,i)=>{const d=document.createElement('div');d.className='kpi '+it.c;d.innerHTML='<div class="kpi-top"><span class="kpi-em">'+it.em+'</span></div><div class="kpi-lb">'+it.lb+'</div><div class="kpi-val">'+it.val+'</div><div class="kpi-sub">'+it.sub+'</div>';kC.appendChild(d)});
   // Top 15 chart (fondos individuales in USD)
   if(data.length){
     const top15=data.sort((a,b)=>(b.patrimonio||0)-(a.patrimonio||0)).slice(0,15);
     if(cFciDol)cFciDol.destroy();
-    cFciDol=new Chart(document.getElementById('cFciDol'),{type:'bar',data:{labels:top15.map(f=>f.fondo?f.fondo.substring(0,30):''),datasets:[{data:top15.map(f=>(f.patrimonio||0)/tc),backgroundColor:top15.map(f=>(f.fondo||'').includes('27.743')?'rgba(251,191,36,.7)':'rgba(56,189,248,.6)'),borderRadius:4,borderSkipped:false}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...tt,callbacks:{label:c=>'US$ '+(c.parsed.x/1e6).toFixed(1)+'M'}}},scales:{x:{ticks:{callback:v=>'US$'+(v/1e6).toFixed(0)+'M'},grid:{color:'rgba(0,0,0,.06)'}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
+    cFciDol=new Chart(document.getElementById('cFciDol'),{type:'bar',data:{labels:top15.map(f=>f.fondo?f.fondo.substring(0,30):''),datasets:[{data:top15.map(f=>(f.patrimonio||0)),backgroundColor:top15.map(f=>(f.fondo||'').includes('27.743')?'rgba(251,191,36,.7)':'rgba(56,189,248,.6)'),borderRadius:4,borderSkipped:false}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...tt,callbacks:{label:c=>{const v=c.parsed.x;return v>=1e9?'US$ '+(v/1e9).toFixed(1)+'B':v>=1e6?'US$ '+(v/1e6).toFixed(0)+'M':'US$ '+v.toFixed(0)}}}},scales:{x:{ticks:{callback:v=>v>=1e9?'US$'+(v/1e9).toFixed(0)+'B':v>=1e6?'US$'+(v/1e6).toFixed(0)+'M':'US$'+v},grid:{color:'rgba(0,0,0,.06)'}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
   }
   // Table
   document.getElementById('fciDolCount').textContent=data.length+' fondos/clases';
@@ -973,8 +978,8 @@ function renderFciDol(data,totals){
   if(data.length){
     tb.innerHTML=data.sort((a,b)=>(b.patrimonio||0)-(a.patrimonio||0)).slice(0,30).map(f=>{
       const isBlanq=(f.fondo||'').includes('27.743');
-      const usd=(f.patrimonio||0)/tc;
-      const usdStr=usd>=1e6?'US$ '+(usd/1e6).toFixed(1)+'M':usd>=1e3?'US$ '+(usd/1e3).toFixed(0)+'K':'US$ '+usd.toFixed(0);
+      const usd=(f.patrimonio||0);
+      const usdStr=usd>=1e9?'US$ '+(usd/1e9).toFixed(1)+'B':usd>=1e6?'US$ '+(usd/1e6).toFixed(0)+'M':usd>=1e3?'US$ '+(usd/1e3).toFixed(0)+'K':'US$ '+usd.toFixed(0);
       return'<tr><td'+(isBlanq?' style="color:var(--amb)"':'')+'>'+f.fondo+(isBlanq?' 🏷️':'')+'</td><td class="mono acc">'+usdStr+'</td></tr>'
     }).join('');
   }else{tb.innerHTML='<tr><td colspan="2" style="color:var(--t3)">Sin datos de fondos individuales</td></tr>'}
