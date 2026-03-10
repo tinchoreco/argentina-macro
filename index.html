@@ -865,17 +865,14 @@ async function loadDolares(){
   try{
     // Fetch BCRA series in parallel
     const hoy=new Date().toISOString().split('T')[0];
-    const [dep108,dep107,prest125,res1]=await Promise.all([
-      fetchBCRA('/Monetarias/108?desde=2023-01-01&hasta='+hoy+'&limit=3000').catch(e=>null),
-      fetchBCRA('/Monetarias/107?desde=2023-01-01&hasta='+hoy+'&limit=3000').catch(e=>null),
-      fetchBCRA('/Monetarias/125?desde=2023-01-01&hasta='+hoy+'&limit=3000').catch(e=>null),
-      fetchBCRA('/Monetarias/1?desde=2023-01-01&hasta='+hoy+'&limit=3000').catch(e=>null),
-    ]);
+    // Load BCRA series sequentially to avoid proxy rate limits
+    let dep108=null,dep107=null,prest125=null,res1=null;
+    try{dep108=await fetchBCRA('/Monetarias/108?desde=2023-06-01&hasta='+hoy+'&limit=1000')}catch(e){console.warn('dep108:',e)}
+    try{res1=await fetchBCRA('/Monetarias/1?desde=2023-06-01&hasta='+hoy+'&limit=1000')}catch(e){console.warn('res1:',e)};
     // Extract detalle arrays
     function getDet(d){if(!d)return[];const r=d.results||d;if(Array.isArray(r)&&r[0]&&r[0].detalle)return r[0].detalle;return r}
     const dDep108=getDet(dep108).reverse();
-    const dDep107=getDet(dep107).reverse();
-    const dPrest=getDet(prest125).reverse();
+    const dRes=getDet(res1).reverse();
     const dRes=getDet(res1).reverse();
     // FCI dolarizados - totales agregados por moneda de cada categoría
     let fciDolTotals={rfUsd:0,rfBill:0,rvUsd:0,rvBill:0,rmUsd:0,rmBill:0};
@@ -896,7 +893,7 @@ async function loadDolares(){
     dolLoaded=true;
     document.getElementById('dolLoading').style.display='none';
     document.getElementById('dolContent').style.display='block';
-    renderDolKpis(dDep108,dDep107,dPrest,dRes,fciDolTotals);
+    renderDolKpis(dDep108,dRes,fciDolTotals);
     renderDepChart(dDep108);
     renderResVsDep(dRes,dDep108);
     renderFciDol(fciDolFondos,fciDolTotals);
@@ -905,7 +902,7 @@ async function loadDolares(){
     console.error(e);
   }
 }
-function renderDolKpis(dep108,dep107,prest,res,fciTotals){
+function renderDolKpis(dep108,res,fciTotals){
   const kC=document.getElementById('dolKpis');kC.innerHTML='';
   const last108=dep108.length?dep108[dep108.length-1]:null;
   const lastRes=res.length?res[res.length-1]:null;
