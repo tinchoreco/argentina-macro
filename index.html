@@ -880,7 +880,6 @@ async function loadDolares(){
     function getDet(d){if(!d)return[];const r=d.results||d;if(Array.isArray(r)&&r[0]&&r[0].detalle)return r[0].detalle;return r}
     const dDep108=getDet(dep108).reverse();
     const dRes=getDet(res1).reverse();
-    const dRes=getDet(res1).reverse();
     // FCI dolarizados - totales agregados por moneda de cada categoría
     let fciDolTotals={rfUsd:0,rfBill:0,rvUsd:0,rvBill:0,rmUsd:0,rmBill:0};
     let fciDolFondos=[];
