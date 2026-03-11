@@ -973,7 +973,7 @@ function renderFciDol(data,totals){
   if(data.length){
     const top15=data.sort((a,b)=>(b.patrimonio||0)-(a.patrimonio||0)).slice(0,15);
     if(cFciDol)cFciDol.destroy();
-    cFciDol=new Chart(document.getElementById('cFciDol'),{type:'bar',data:{labels:top15.map(f=>f.fondo?f.fondo.substring(0,30):''),datasets:[{data:top15.map(f=>(f.patrimonio||0)),backgroundColor:top15.map(f=>(f.fondo||'').includes('27.743')?'rgba(251,191,36,.7)':'rgba(56,189,248,.6)'),borderRadius:4,borderSkipped:false}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...tt,callbacks:{label:c=>{const v=c.parsed.x;return v>=1e9?'US$ '+(v/1e9).toFixed(1)+'B':v>=1e6?'US$ '+(v/1e6).toFixed(0)+'M':'US$ '+v.toFixed(0)}}}},scales:{x:{ticks:{callback:v=>v>=1e9?'US$'+(v/1e9).toFixed(0)+'B':v>=1e6?'US$'+(v/1e6).toFixed(0)+'M':'US$'+v},grid:{color:'rgba(0,0,0,.06)'}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
+    cFciDol=new Chart(document.getElementById('cFciDol'),{type:'bar',data:{labels:top15.map(f=>f.fondo?f.fondo.substring(0,30):''),datasets:[{data:top15.map(f=>(f.patrimonio||0)/tc),backgroundColor:top15.map(f=>(f.fondo||'').includes('27.743')?'rgba(251,191,36,.7)':'rgba(56,189,248,.6)'),borderRadius:4,borderSkipped:false}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{...tt,callbacks:{label:c=>{const v=c.parsed.x;return v>=1e9?'US$ '+(v/1e9).toFixed(1)+'B':v>=1e6?'US$ '+(v/1e6).toFixed(0)+'M':'US$ '+v.toFixed(0)}}}},scales:{x:{ticks:{callback:v=>v>=1e9?'US$'+(v/1e9).toFixed(0)+'B':v>=1e6?'US$'+(v/1e6).toFixed(0)+'M':'US$'+v},grid:{color:'rgba(0,0,0,.06)'}},y:{grid:{display:false},ticks:{font:{size:9}}}}}});
   }
   // Table
   document.getElementById('fciDolCount').textContent=data.length+' fondos/clases';
@@ -981,7 +981,7 @@ function renderFciDol(data,totals){
   if(data.length){
     tb.innerHTML=data.sort((a,b)=>(b.patrimonio||0)-(a.patrimonio||0)).slice(0,30).map(f=>{
       const isBlanq=(f.fondo||'').includes('27.743');
-      const usd=(f.patrimonio||0);
+      const usd=(f.patrimonio||0)/tc;
       const usdStr=usd>=1e9?'US$ '+(usd/1e9).toFixed(1)+'B':usd>=1e6?'US$ '+(usd/1e6).toFixed(0)+'M':usd>=1e3?'US$ '+(usd/1e3).toFixed(0)+'K':'US$ '+usd.toFixed(0);
       return'<tr><td'+(isBlanq?' style="color:var(--amb)"':'')+'>'+f.fondo+(isBlanq?' 🏷️':'')+'</td><td class="mono acc">'+usdStr+'</td></tr>'
     }).join('');
