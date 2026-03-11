@@ -921,7 +921,7 @@ function renderDolKpis(dep108,res,fciTotals){
   // Find pre-blanqueo value (Aug 2024)
   const preBlanq=dep108.find(d=>d.fecha==='2024-08-30')||dep108.find(d=>d.fecha&&d.fecha.startsWith('2024-08'));
   // Total dólares en sistema = depósitos + FCI RF
-  const totalSistema=(last108?last108.valor:0)+rfUsd;
+  const totalSistema=(last108?last108.valor:0)+rfUsdVal;
   const items=[
     {em:'🏦',lb:'Depósitos USD Privados',val:last108?'US$ '+last108.valor.toLocaleString('es-AR')+' M':'—',sub:last108?last108.fecha+(preBlanq?' · <span class="up">+'+(last108.valor-preBlanq.valor).toLocaleString('es-AR')+' vs ago-24</span>':''):'',c:'s'},
     {em:'📊',lb:'FCI Renta Fija USD',val:fmtUsdM(rfUsdVal),sub:'Bonos corporativos y soberanos en USD',c:'e'},
