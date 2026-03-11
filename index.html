@@ -860,15 +860,22 @@ function renderCorrMatrix(assets){
 
 // === TAB 5: DÓLARES ===
 let dolLoaded=false;let cDepUsd,cResVsDep,cFciDol;
+async function fetchWithTimeout(url,ms){const c=new AbortController();const t=setTimeout(()=>c.abort(),ms);try{const r=await fetch(url,{signal:c.signal,redirect:'follow'});clearTimeout(t);if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}catch(e){clearTimeout(t);throw e}}
+async function fetchBCRAFast(ep){
+  const url=BCRA_BASE+ep;
+  // Try proxies first (direct often fails in browser due to SSL)
+  for(let p=0;p<PROXIES.length;p++){try{return await fetchWithTimeout(PROXIES[p](url),8000)}catch(e){continue}}
+  // Try direct as last resort
+  try{return await fetchWithTimeout(url,5000)}catch(e){}
+  throw new Error('BCRA timeout');
+}
 async function loadDolares(){
   if(dolLoaded)return;
   try{
-    // Fetch BCRA series in parallel
     const hoy=new Date().toISOString().split('T')[0];
-    // Load BCRA series sequentially to avoid proxy rate limits
-    let dep108=null,dep107=null,prest125=null,res1=null;
-    try{dep108=await fetchBCRA('/Monetarias/108?desde=2023-06-01&hasta='+hoy+'&limit=1000')}catch(e){console.warn('dep108:',e)}
-    try{res1=await fetchBCRA('/Monetarias/1?desde=2023-06-01&hasta='+hoy+'&limit=1000')}catch(e){console.warn('res1:',e)};
+    let dep108=null,res1=null;
+    try{dep108=await fetchBCRAFast('/Monetarias/108?desde=2023-06-01&hasta='+hoy+'&limit=1000')}catch(e){console.warn('dep108:',e)}
+    try{res1=await fetchBCRAFast('/Monetarias/1?desde=2023-06-01&hasta='+hoy+'&limit=1000')}catch(e){console.warn('res1:',e)};
     // Extract detalle arrays
     function getDet(d){if(!d)return[];const r=d.results||d;if(Array.isArray(r)&&r[0]&&r[0].detalle)return r[0].detalle;return r}
     const dDep108=getDet(dep108).reverse();
