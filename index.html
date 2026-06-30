@@ -142,6 +142,7 @@ body{transition:background .3s,color .3s}
 <button class="tab" data-tab="tab3">📈 Activos</button>
 <button class="tab" data-tab="tab4">🧮 CAPM</button>
 <button class="tab" data-tab="tab5">💵 Dólares</button>
+<button class="tab" data-tab="tab6">📜 Bonos</button>
 </div>
 
 <!-- ==================== TAB 1: MERCADO ==================== -->
@@ -309,6 +310,58 @@ Armá tu portafolio agregando tickers. El modelo calcula el rendimiento esperado
 <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fondo</th><th>Patrimonio USD</th></tr></thead><tbody id="fciDolBody"></tbody></table></div>
 </div>
 </div>
+
+<!-- ==================== TAB 6: BONOS ==================== -->
+<div class="tab-content" id="tab6">
+<div class="sec">📜 Bonos Soberanos en USD <span class="sec-tag">data912 · cada bono en su moneda de cobro</span></div>
+<div class="kpis" id="bonKpis" style="grid-template-columns:repeat(4,1fr)"></div>
+<div id="bonLoading" class="mini-lo"><div class="spin"></div><p style="margin-top:12px">Cargando bonos y tipos de cambio...</p></div>
+<div id="bonContent" style="display:none">
+<div class="cg">
+<div class="cc"><div class="ch"><span class="ct">Curva de rendimientos</span><span class="ctag">TIR vs duración</span></div><div class="cb t"><canvas id="cBonCurve"></canvas></div></div>
+<div class="cc" id="bonIdxWrap"><div class="ch"><span class="ct">Índice base 100</span><span class="ctag" id="bonIdxTag">desde 05/06</span></div><div class="cb t"><canvas id="cBonIdx"></canvas></div></div>
+</div>
+<div class="sec">📋 Detalle por bono</div>
+<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Bono</th><th>Moneda</th><th>Precio USD</th><th>TIR</th><th>Dur. mod.</th><th>Convex.</th><th>DV01</th></tr></thead><tbody id="bonBody"></tbody></table></div>
+<div class="sec">💼 Cartera <span class="sec-tag">riesgo agregado · duración objetivo</span></div>
+<div class="cc f" style="margin-bottom:16px">
+<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+<div style="min-width:130px"><label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">BONO</label>
+<select id="bonHoldTk" style="width:100%;background:var(--bg2);color:var(--t1);border:1px solid var(--brd);padding:10px 14px;border-radius:8px;font-family:var(--fb);font-size:13px">
+<option value="GD41">GD41 (cable)</option><option value="AE38">AE38 (MEP)</option><option value="AL41">AL41 (MEP)</option><option value="AO27">AO27 (MEP)</option></select></div>
+<div style="min-width:120px"><label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">NOMINAL (VN)</label>
+<input id="bonHoldVN" type="number" value="10000" min="1" style="width:100%;background:var(--bg2);color:var(--t1);border:1px solid var(--brd);padding:10px 14px;border-radius:8px;font-family:var(--fm);font-size:13px"></div>
+<button class="rbtn" id="bonHoldAdd" style="height:42px">+ Agregar</button>
+<div style="flex:1;min-width:20px"></div>
+<div style="min-width:150px"><label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">DURACIÓN OBJETIVO</label>
+<input id="bonDurTarget" type="number" step="0.1" placeholder="ej: 4.5" style="width:100%;background:var(--bg2);color:var(--t1);border:1px solid var(--brd);padding:10px 14px;border-radius:8px;font-family:var(--fm);font-size:13px"></div>
+</div>
+</div>
+<div id="bonPortEmpty" style="color:var(--t3);font-size:13px;padding:6px 2px">Agregá bonos para ver el riesgo agregado de la cartera.</div>
+<div id="bonPortWrap" style="display:none">
+<div class="kpis" id="bonPortKpis" style="grid-template-columns:repeat(4,1fr)"></div>
+<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Bono</th><th>Nominal</th><th>Precio</th><th>Valor USD</th><th>Peso</th><th>Dur.mod</th><th>Contrib.</th><th>DV01 pos</th><th></th></tr></thead><tbody id="bonPortBody"></tbody></table></div>
+<div id="bonDurGap" style="display:none;margin-top:12px;padding:14px 18px;border-radius:10px;border:1px solid var(--brd);background:var(--card2);font-size:13px"></div>
+</div>
+<div class="sec">📐 Sensibilidad <span class="sec-tag">shock paralelo de TIR (% precio)</span></div>
+<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Bono</th><th>−200pb</th><th>−100pb</th><th>−50pb</th><th>−25pb</th><th>+25pb</th><th>+50pb</th><th>+100pb</th><th>+200pb</th></tr></thead><tbody id="bonSensBody"></tbody></table></div>
+<div class="sec">📉 Escenarios de compresión <span class="sec-tag">retorno total a horizonte</span></div>
+<div class="cc f" style="margin-bottom:12px">
+<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+<div style="min-width:130px"><label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">RIESGO PAÍS ACTUAL</label>
+<input id="bonScenRP" type="number" style="width:100%;background:var(--bg2);color:var(--t1);border:1px solid var(--brd);padding:10px 14px;border-radius:8px;font-family:var(--fm);font-size:13px"></div>
+<div style="min-width:120px"><label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">HORIZONTE</label>
+<select id="bonScenHor" style="width:100%;background:var(--bg2);color:var(--t1);border:1px solid var(--brd);padding:10px 14px;border-radius:8px;font-family:var(--fb);font-size:13px"><option value="6">6 meses</option><option value="12" selected>1 año</option><option value="2027">a fin 2027</option></select></div>
+<div style="min-width:160px"><label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">ESCENARIOS RP (pb)</label>
+<input id="bonScenTargets" type="text" value="400, 350, 300" style="width:100%;background:var(--bg2);color:var(--t1);border:1px solid var(--brd);padding:10px 14px;border-radius:8px;font-family:var(--fm);font-size:13px"></div>
+<button class="rbtn" id="bonScenRun" style="height:42px">⚡ Calcular</button>
+</div>
+</div>
+<div class="tbl-wrap"><table class="tbl"><thead id="bonScenHead"></thead><tbody id="bonScenBody"></tbody></table></div>
+<p style="font-size:11px;color:var(--t3);margin-top:8px;font-family:var(--fm)">Retorno total = cambio de precio (reprecio al nuevo TIR) + carry cobrado al horizonte. Supone UST constante y compresión pareja del spread (aplica mejor a GD/AL). Material educativo, no es recomendación.</p>
+<p style="font-size:11px;color:var(--t3);margin-top:10px;font-family:var(--fm)">GD = dólar cable (CCL) · AL/AE/AO = dólar MEP · TIR despejada del precio en su moneda real (índice neto de brecha). Material educativo, no es recomendación.</p>
+</div>
+</div>
 <footer class="footer">
 <p>Datos: <a href="https://argentinadatos.com" target="_blank">ArgentinaDatos API</a> · <a href="https://www.bcra.gob.ar/apis-banco-central/" target="_blank">BCRA API</a> — Fuentes: BCRA, INDEC, CAFCI, JP Morgan, Ámbito</p>
 <p style="margin-top:6px">Dashboard generado para fines educativos — Curso Power BI</p>
@@ -360,6 +413,7 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
   t.classList.add('active');document.getElementById(t.dataset.tab).classList.add('active');
   if(t.dataset.tab==='tab2'&&!bcraLoaded)loadBCRA();
   if(t.dataset.tab==='tab5'&&!dolLoaded)loadDolares();
+  if(t.dataset.tab==='tab6'&&!bonosLoaded)loadBonos();
 }));
 
 // === TAB 1: MERCADO ===
@@ -1011,6 +1065,224 @@ document.getElementById('themeToggle').addEventListener('click',()=>{
 });
 // Restore saved theme
 try{if(localStorage.getItem('theme')==='dark'){isDark=true;document.documentElement.classList.add('dark');document.getElementById('themeToggle').textContent='☀️';setTimeout(updateChartTheme,100)}}catch(e){}
+
+// ==================== TAB 6: BONOS ====================
+// Math: TIR/duración/convexidad despejadas del precio en moneda real (data912).
+function bD360(a,b){let d1=a.d,d2=b.d;if(d1===31)d1=30;if(d2===31&&d1===30)d2=30;return 360*(b.y-a.y)+30*(b.m-a.m)+(d2-d1);}
+function bSemi(s,e){const o=[];let y=s.y,m=s.m;const d=s.d;while(y<e.y||(y===e.y&&m<=e.m)){o.push({y,m,d});m+=6;if(m>12){m-=12;y++;}}return o;}
+function bRate(sch,dt){let r=sch[0][1];for(const[d,v]of sch){if(d.y<dt.y||(d.y===dt.y&&(d.m<dt.m||(d.m===dt.m&&d.d<dt.d))))r=v;}return r;}
+function bAmort(am,sch,pd,val){let out=100;const cfs=[];const k=p=>p.y*1e4+p.m*100+p.d;pd.sort((a,b)=>k(a)-k(b));
+  for(const p of pd){const r=bRate(sch,p);const cpn=out*r/2;const a=am[k(p)]||0;cfs.push({date:p,c:cpn+a});out-=a;}return cfs.filter(x=>bD360(val,x.date)>0);}
+function bBullet(mat,cpnA,val){const cfs=[];let y=2024,m=1;const d=mat.d;const mo=100*cpnA/12;
+  while(y<mat.y||(y===mat.y&&m<=mat.m)){const dt={y,m,d};const im=(y===mat.y&&m===mat.m);cfs.push({date:dt,c:mo+(im?100:0)});m++;if(m>12){m=1;y++;}}return cfs.filter(x=>bD360(val,x.date)>0);}
+function bCf2041(val){const cd=bSemi({y:2021,m:7,d:9},{y:2041,m:7,d:9});const amd=bSemi({y:2028,m:1,d:9},{y:2041,m:7,d:9});
+  const am={};amd.forEach(p=>am[p.y*1e4+p.m*100+p.d]=100/28);const sch=[[{y:2020,m:9,d:4},0.035],[{y:2029,m:7,d:9},0.04875]];
+  const all=cd.concat(amd.filter(a=>!cd.some(c=>c.y===a.y&&c.m===a.m)));return bAmort(am,sch,all,val);}
+function bCf2038(val){const cd=bSemi({y:2021,m:7,d:9},{y:2038,m:1,d:9});const amd=bSemi({y:2027,m:7,d:9},{y:2038,m:1,d:9});
+  const am={};amd.forEach(p=>am[p.y*1e4+p.m*100+p.d]=100/22);const sch=[[{y:2020,m:9,d:4},0.05]];
+  const all=cd.concat(amd.filter(a=>!cd.some(c=>c.y===a.y&&c.m===a.m)));return bAmort(am,sch,all,val);}
+function bCfAO27(val){return bBullet({y:2027,m:10,d:29},0.06,val);}
+function bMetrics(cfs,y,m,val){const per=1+y/m;let pv=0,pvt=0,cx=0;
+  for(const{date,c}of cfs){const t=bD360(val,date)/360;if(t<=0)continue;const n=t*m,df=Math.pow(per,-n),p=c*df;pv+=p;pvt+=t*p;cx+=n*(n+1)*c*Math.pow(per,-(n+2));}
+  const mac=pvt/pv,mod=mac/per;return{pv,mac,mod,conv:cx/(pv*m*m),dv01:mod*pv*1e-4};}
+function bSolve(cfs,price,m,val){let lo=5e-4,hi=.6;for(let i=0;i<200;i++){const md=(lo+hi)/2;if(bMetrics(cfs,md,m,val).pv>price)lo=md;else hi=md;}return(lo+hi)/2;}
+
+const BON_INSTR={
+  GD41:{cur:'CCL',label:'GD41 · Global 2041',cf:bCf2041,m:2,law:'NY',col:'#2563eb'},
+  AE38:{cur:'MEP',label:'AE38 · Bonar 2038',cf:bCf2038,m:2,law:'local',col:'#d97706'},
+  AL41:{cur:'MEP',label:'AL41 · Bonar 2041',cf:bCf2041,m:2,law:'local',col:'#7c3aed'},
+  AO27:{cur:'MEP',label:'AO27 · Bonar 2027',cf:bCfAO27,m:12,law:'local',col:'#059669'}
+};
+const BON_BASE='2026-06-05';
+const D912='https://data912.com';
+let bonosLoaded=false,cBonCurve,cBonIdx;
+let bonByTk={},bonHoldings=[];
+
+async function fetchD912(ep){
+  for(let p=0;p<PROXIES.length;p++){try{const r=await fetch(PROXIES[p](D912+ep));if(r.ok)return await r.json()}catch(e){}}
+  try{const r=await fetch(D912+ep);if(r.ok)return await r.json()}catch(e){}
+  throw new Error('data912 no responde ('+ep+')');
+}
+function bonMedian(arr){const v=arr.map(x=>x.c).filter(x=>x>0).sort((a,b)=>a-b);return v.length?v[Math.floor(v.length/2)]:null;}
+function bonToday(){const d=new Date();return{y:d.getFullYear(),m:d.getMonth()+1,d:d.getDate()};}
+
+async function loadBonos(){
+  bonosLoaded=true;
+  try{
+    const[bonds,mepP,cclP]=await Promise.all([fetchD912('/live/arg_bonds'),fetchD912('/live/mep'),fetchD912('/live/ccl')]);
+    const px={};bonds.forEach(b=>{px[b.symbol]=b.c});
+    const MEP=bonMedian(mepP),CCL=bonMedian(cclP);
+    let rp=null;try{const r=await fetchAPI('/finanzas/indices/riesgo-pais');rp=r[r.length-1]&&r[r.length-1].valor}catch(e){}
+    const val=bonToday(),rows=[],curve=[];
+    for(const[tk,cfg]of Object.entries(BON_INSTR)){
+      const ars=px[tk];if(ars==null){rows.push({tk,cfg,price:null});continue}
+      const fx=cfg.cur==='CCL'?CCL:MEP;const price=ars/fx;
+      const cfs=cfg.cf(val),y=bSolve(cfs,price,cfg.m,val),mm=bMetrics(cfs,y,cfg.m,val);
+      rows.push({tk,cfg,price,tir:y*100,mod:mm.mod,conv:mm.conv,dv01:mm.dv01});
+      curve.push({x:mm.mod,y:y*100,tk,law:cfg.law});
+    }
+    renderBonKpis(rp,CCL,MEP,rows);renderBonTable(rows);renderBonCurve(curve);
+    bonByTk={};rows.forEach(r=>{if(r.price!=null)bonByTk[r.tk]={price:r.price,tir:r.tir,mod:r.mod,conv:r.conv,dv01:r.dv01}});bonRP=rp;var _e=document.getElementById("bonScenRP");if(_e&&rp!=null)_e.value=rp;renderPortfolio();renderSens();runScenarios();
+    document.getElementById('bonLoading').style.display='none';
+    document.getElementById('bonContent').style.display='block';
+    loadBonIndex(MEP,CCL).catch(e=>{console.warn('índice bonos:',e);document.getElementById('bonIdxWrap').style.display='none';});
+  }catch(e){document.getElementById('bonLoading').innerHTML='<p style="color:var(--rose)">Error al cargar bonos: '+e.message+'</p>';console.error(e);}
+}
+
+function renderBonKpis(rp,ccl,mep,rows){
+  const brecha=ccl&&mep?((ccl/mep-1)*100).toFixed(2):'—';
+  const gd=rows.find(r=>r.tk==='GD41'),al=rows.find(r=>r.tk==='AL41');
+  const k=[
+    {em:'🌡️',lb:'Riesgo País',val:rp!=null?rp+' pts':'—',sub:'JP Morgan EMBI+',c:'r'},
+    {em:'📊',lb:'Brecha CCL/MEP',val:brecha+'%',sub:'Cable vs MEP',c:'v'},
+    {em:'🗽',lb:'TIR GD41 (cable)',val:gd&&gd.tir?gd.tir.toFixed(2)+'%':'—',sub:'Global 2041 · ley NY',c:'s'},
+    {em:'🏛️',lb:'TIR AL41 (MEP)',val:al&&al.tir?al.tir.toFixed(2)+'%':'—',sub:'Bonar 2041 · ley local',c:'a'}
+  ];
+  const c=document.getElementById('bonKpis');c.innerHTML='';
+  k.forEach((it,i)=>{const d=document.createElement('div');d.className='kpi '+it.c;d.style.animationDelay=(.05*i)+'s';
+    d.innerHTML='<div class="kpi-top"><span class="kpi-em">'+it.em+'</span></div><div class="kpi-lb">'+it.lb+'</div><div class="kpi-val">'+it.val+'</div><div class="kpi-sub">'+it.sub+'</div>';c.appendChild(d);});
+}
+function renderBonTable(rows){
+  const fm=(v,d=2)=>v==null?'—':v.toLocaleString('es-AR',{minimumFractionDigits:d,maximumFractionDigits:d});
+  document.getElementById('bonBody').innerHTML=rows.map(r=>{
+    const cur=r.cfg.cur==='CCL'?'<span class="acc">CCL</span>':(r.cfg.cur==='MEP'?'MEP':'$');
+    return '<tr><td class="mono" style="font-weight:700">'+r.tk+'</td><td>'+cur+'</td><td class="mono">'+fm(r.price)+'</td>'+
+      '<td class="mono grn">'+(r.tir?fm(r.tir)+'%':'—')+'</td><td class="mono">'+fm(r.mod)+'</td><td class="mono">'+(r.conv?fm(r.conv,1):'—')+'</td><td class="mono">'+(r.dv01?fm(r.dv01,4):'—')+'</td></tr>';
+  }).join('');
+}
+function renderBonCurve(curve){
+  const ny=curve.filter(p=>p.law==='NY'),lo=curve.filter(p=>p.law!=='NY');
+  const lbl={id:'bonlbl',afterDatasetsDraw(c){const x=c.ctx;x.save();x.font='600 11px '+getComputedStyle(document.body).fontFamily;x.fillStyle=getComputedStyle(document.body).getPropertyValue('--t1');
+    c.data.datasets.forEach((ds,i)=>{c.getDatasetMeta(i).data.forEach((pt,j)=>{x.fillText(ds.data[j].tk,pt.x+8,pt.y+4);});});x.restore();}};
+  if(cBonCurve)cBonCurve.destroy();
+  cBonCurve=new Chart(document.getElementById('cBonCurve'),{type:'scatter',
+    data:{datasets:[{label:'Ley NY (cable)',data:ny,backgroundColor:'#2563eb',pointRadius:7,pointHoverRadius:9},
+                    {label:'Ley local (MEP)',data:lo,backgroundColor:'#d97706',pointStyle:'triangle',pointRadius:8,pointHoverRadius:10}]},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:14},
+      plugins:{legend:{labels:{usePointStyle:true,boxWidth:8}},tooltip:{...tt,callbacks:{label:c=>c.raw.tk+': '+c.raw.y.toFixed(2)+'% · dur '+c.raw.x.toFixed(2)}}},
+      scales:{x:{title:{display:true,text:'Duración modificada (años)'},grid:{color:'rgba(0,0,0,.06)'}},y:{title:{display:true,text:'TIR (%)'},grid:{color:'rgba(0,0,0,.06)'}}}},
+    plugins:[lbl]});
+}
+
+async function loadBonIndex(MEP,CCL){
+  const casas=await fetchAPI('/cotizaciones/dolares');
+  const fxByDate=(name)=>{const m={};casas.filter(c=>c.casa===name).forEach(c=>{m[c.fecha]=c.venta});return m;};
+  const mepH=fxByDate('bolsa'),cclH=fxByDate('contadoconliqui');
+  const series={};
+  for(const[tk,cfg]of Object.entries(BON_INSTR)){
+    let hist;try{hist=await fetchD912('/historical/bonds/'+tk)}catch(e){continue}
+    const fxH=cfg.cur==='CCL'?cclH:mepH;
+    const m={};hist.forEach(h=>{const f=(h.date||'').slice(0,10);const fx=fxH[f];if(fx&&h.c)m[f]=h.c/fx;});
+    series[tk]=m;
+  }
+  const allDates=new Set();Object.values(series).forEach(m=>Object.keys(m).forEach(d=>{if(d>=BON_BASE)allDates.add(d)}));
+  const dates=[...allDates].sort();
+  if(!dates.length)throw new Error('sin histórico');
+  const base={};for(const tk in series){const bd=dates.find(d=>series[tk][d]!=null);base[tk]=series[tk][bd];}
+  let rpH={};try{const rp=await fetchAPI('/finanzas/indices/riesgo-pais');rp.forEach(x=>{rpH[x.fecha]=x.valor});}catch(e){}
+  const idx={};for(const tk in series)idx[tk]=dates.map(d=>series[tk][d]!=null&&base[tk]?+(series[tk][d]/base[tk]*100).toFixed(2):null);
+  const rpArr=dates.map(d=>rpH[d]!=null?rpH[d]:null);
+  renderBonIdx(dates,idx,rpArr);
+  document.getElementById('bonIdxTag').textContent='base 100 · '+dates[0];
+}
+function renderBonIdx(dates,idx,rp){
+  const ds=Object.entries(BON_INSTR).map(([tk,cfg])=>({label:tk,data:idx[tk],borderColor:cfg.col,backgroundColor:cfg.col,tension:.25,pointRadius:0,pointHoverRadius:4,borderWidth:2,spanGaps:true,yAxisID:'y'}));
+  ds.push({label:'Riesgo país',data:rp,borderColor:'#dc2626',backgroundColor:'#dc2626',borderDash:[5,4],tension:.25,pointRadius:0,borderWidth:1.5,yAxisID:'y1'});
+  if(cBonIdx)cBonIdx.destroy();
+  cBonIdx=new Chart(document.getElementById('cBonIdx'),{type:'line',data:{labels:dates,datasets:ds},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{usePointStyle:true,boxWidth:8,font:{size:10}}},tooltip:{...tt}},
+      scales:{y:{title:{display:true,text:'Índice (base 100)'},grid:{color:'rgba(0,0,0,.06)'}},
+              y1:{position:'right',title:{display:true,text:'Riesgo país'},grid:{drawOnChartArea:false}},
+              x:{grid:{display:false},ticks:{maxTicksLimit:10,font:{size:10}}}}}});
+}
+
+
+// --- Cartera (Sprint A): riesgo agregado + duración objetivo ---
+function portMetrics(){
+  let mv=0;const items=[];
+  bonHoldings.forEach(h=>{const m=bonByTk[h.tk];if(!m||m.price==null)return;const v=h.nominal*m.price/100;items.push({tk:h.tk,nominal:h.nominal,price:m.price,mod:m.mod,conv:m.conv,mv:v});mv+=v;});
+  let mod=0,conv=0,dv01=0;
+  items.forEach(it=>{it.w=mv?it.mv/mv:0;it.contrib=it.w*it.mod;it.dv01pos=it.mv*it.mod*1e-4;mod+=it.contrib;conv+=it.w*it.conv;dv01+=it.dv01pos;});
+  return{mv,mod,conv,dv01,items};
+}
+function renderPortfolio(){
+  const empty=document.getElementById('bonPortEmpty'),wrap=document.getElementById('bonPortWrap');
+  if(!empty||!wrap)return;
+  if(!bonHoldings.length){empty.style.display='block';empty.textContent='Agregá bonos para ver el riesgo agregado de la cartera.';wrap.style.display='none';return;}
+  const p=portMetrics();
+  if(!p.items.length){empty.style.display='block';empty.textContent='Esperando datos de bonos (abrí la pestaña o actualizá).';wrap.style.display='none';return;}
+  empty.style.display='none';wrap.style.display='block';
+  const fm=(v,d=2)=>v==null?'\u2014':v.toLocaleString('es-AR',{minimumFractionDigits:d,maximumFractionDigits:d});
+  const k=[
+   {em:'💰',lb:'Valor de cartera',val:'US$ '+fm(p.mv,0),sub:p.items.length+' bonos',c:'s'},
+   {em:'⏱️',lb:'Duración mod. ponderada',val:fm(p.mod)+' años',sub:'sensibilidad a la TIR',c:'v'},
+   {em:'📈',lb:'Convexidad ponderada',val:fm(p.conv,1),sub:'curvatura',c:'a'},
+   {em:'⚡',lb:'DV01 de la cartera',val:'US$ '+fm(p.dv01),sub:'por +1 pb de TIR',c:'r'}
+  ];
+  const kc=document.getElementById('bonPortKpis');kc.innerHTML='';
+  k.forEach((it,i)=>{const d=document.createElement('div');d.className='kpi '+it.c;d.style.animationDelay=(.04*i)+'s';d.innerHTML='<div class="kpi-top"><span class="kpi-em">'+it.em+'</span></div><div class="kpi-lb">'+it.lb+'</div><div class="kpi-val">'+it.val+'</div><div class="kpi-sub">'+it.sub+'</div>';kc.appendChild(d);});
+  document.getElementById('bonPortBody').innerHTML=p.items.map((it,i)=>'<tr><td class="mono" style="font-weight:700">'+it.tk+'</td><td class="mono">'+fm(it.nominal,0)+'</td><td class="mono">'+fm(it.price)+'</td><td class="mono">'+fm(it.mv,0)+'</td><td class="mono acc">'+fm(it.w*100,1)+'%</td><td class="mono">'+fm(it.mod)+'</td><td class="mono">'+fm(it.contrib)+'</td><td class="mono">'+fm(it.dv01pos)+'</td><td><button class="rbtn" style="padding:4px 10px;font-size:11px" onclick="removeBonHold('+i+')">✕</button></td></tr>').join('');
+  renderDurTarget(p);renderSens();runScenarios();
+}
+function renderDurTarget(p){
+  const box=document.getElementById('bonDurGap');if(!box)return;
+  const t=parseFloat(document.getElementById('bonDurTarget').value);
+  if(!t||!p.items.length){box.style.display='none';return;}
+  const gap=t-p.mod;const s=[...p.items].sort((a,b)=>a.mod-b.mod);const lo=s[0],hi=s[s.length-1];
+  let html='<div style="font-weight:600;margin-bottom:6px">🎯 Duración objetivo: '+t.toFixed(2)+' años</div>';
+  html+='<div style="color:var(--t2)">Actual: <b>'+p.mod.toFixed(2)+'</b> · brecha: <b style="color:'+(Math.abs(gap)<0.05?'var(--em)':'var(--amb)')+'">'+(gap>0?'+':'')+gap.toFixed(2)+'</b> años. ';
+  if(Math.abs(gap)<0.05)html+='Estás en el objetivo.';
+  else html+=(gap>0?'Necesitás <b>más</b> duración: aumentá ':'Necesitás <b>menos</b> duración: reducí ')+'ponderación de los tramos largos.';
+  html+='</div>';
+  if(hi.mod!==lo.mod){const wHi=(t-lo.mod)/(hi.mod-lo.mod);
+    if(wHi>=0&&wHi<=1)html+='<div style="margin-top:8px;color:var(--t2)">Barbell para clavar el objetivo: <b>'+(wHi*100).toFixed(0)+'%</b> en '+hi.tk+' (dur '+hi.mod.toFixed(2)+') + <b>'+((1-wHi)*100).toFixed(0)+'%</b> en '+lo.tk+' (dur '+lo.mod.toFixed(2)+').</div>';
+    else html+='<div style="margin-top:8px;color:var(--amb)">El objetivo queda fuera del rango de tus bonos ('+lo.mod.toFixed(2)+'–'+hi.mod.toFixed(2)+'). Sumá un bono más '+(t>hi.mod?'largo':'corto')+'.</div>';
+  }
+  box.style.display='block';box.innerHTML=html;
+}
+function removeBonHold(i){bonHoldings.splice(i,1);renderPortfolio();}
+(function(){const add=document.getElementById('bonHoldAdd');if(add)add.addEventListener('click',()=>{
+  const tk=document.getElementById('bonHoldTk').value;const vn=parseFloat(document.getElementById('bonHoldVN').value);
+  if(!tk||!vn||vn<=0)return;const ex=bonHoldings.find(h=>h.tk===tk);if(ex)ex.nominal+=vn;else bonHoldings.push({tk,nominal:vn});renderPortfolio();});
+  const dt=document.getElementById('bonDurTarget');if(dt)dt.addEventListener('input',renderPortfolio);})();
+
+
+// --- Sprint B: sensibilidad + escenarios de compresión ---
+let bonRP=null;
+const BON_SHOCKS=[-200,-100,-50,-25,25,50,100,200];
+function bonAddMonths(d,n){let y=d.y,m=d.m+n;while(m>12){m-=12;y++;}return{y,m,d:d.d};}
+function bonHorizonDate(){const el=document.getElementById("bonScenHor");const v=el?el.value:"12";if(v==="2027")return{y:2027,m:12,d:31};return bonAddMonths(bonToday(),parseInt(v));}
+function bonWeights(){let mv=0;const w={};bonHoldings.forEach(h=>{const m=bonByTk[h.tk];if(!m)return;const v=h.nominal*m.price/100;w[h.tk]=(w[h.tk]||0)+v;mv+=v;});if(!mv)return null;Object.keys(w).forEach(k=>w[k]/=mv);return w;}
+function bonCell(v){return '<td class="mono" style="color:'+(v>=0?'var(--em)':'var(--rose)')+'">'+(v>=0?'+':'')+(v*100).toFixed(1)+'%</td>';}
+function renderSens(){
+  const body=document.getElementById("bonSensBody");if(!body)return;
+  const tks=Object.keys(BON_INSTR).filter(t=>bonByTk[t]);
+  let rows=tks.map(tk=>{const m=bonByTk[tk];const c=BON_SHOCKS.map(bp=>{const dy=bp/10000;return bonCell(-m.mod*dy+0.5*m.conv*dy*dy);}).join('');return '<tr><td class="mono" style="font-weight:700">'+tk+'</td>'+c+'</tr>';});
+  const w=bonWeights();
+  if(w){const c=BON_SHOCKS.map(bp=>{const dy=bp/10000;let ch=0;for(const tk in w){const m=bonByTk[tk];ch+=w[tk]*(-m.mod*dy+0.5*m.conv*dy*dy);}return bonCell(ch);}).join('');
+    rows.push('<tr style="background:var(--card2)"><td class="mono" style="font-weight:700">CARTERA</td>'+c+'</tr>');}
+  body.innerHTML=rows.join('')||'<tr><td colspan="9" style="color:var(--t3)">Sin datos</td></tr>';
+}
+function bonHorTR(tk,newTir,today,hor){const cfg=BON_INSTR[tk];const all=cfg.cf(today);const key=p=>p.y*1e4+p.m*100+p.d;let carry=0;const rem=[];
+  all.forEach(o=>{const k=key(o.date);if(k<=key(today))return;if(k<=key(hor))carry+=o.c;else rem.push(o);});
+  const pH=bMetrics(rem,newTir,cfg.m,hor).pv;const p0=bonByTk[tk].price;return(pH+carry-p0)/p0;}
+function runScenarios(){
+  const head=document.getElementById("bonScenHead"),body=document.getElementById("bonScenBody");if(!head||!body)return;
+  const curRP=parseFloat(document.getElementById("bonScenRP").value)||bonRP;
+  if(!curRP){body.innerHTML='<tr><td style="color:var(--t3)">Falta riesgo país</td></tr>';return;}
+  const targets=(document.getElementById("bonScenTargets").value||'').split(',').map(s=>parseFloat(s.trim())).filter(x=>x>0);
+  const scens=[curRP].concat(targets);const today=bonToday(),hor=bonHorizonDate();
+  head.innerHTML='<tr><th>Bono</th>'+scens.map((s,i)=>'<th>'+(i===0?'Hold '+s:'→ '+s)+'</th>').join('')+'</tr>';
+  const tks=Object.keys(BON_INSTR).filter(t=>bonByTk[t]);const store={};
+  let rows=tks.map(tk=>{const tir0=bonByTk[tk].tir/100;store[tk]=[];const c=scens.map(s=>{const nt=tir0+(s-curRP)/10000;const tr=bonHorTR(tk,nt,today,hor);store[tk].push(tr);return bonCell(tr);}).join('');return '<tr><td class="mono" style="font-weight:700">'+tk+'</td>'+c+'</tr>';});
+  const w=bonWeights();
+  if(w){const c=scens.map((s,si)=>{let tr=0;for(const tk in w)tr+=w[tk]*store[tk][si];return bonCell(tr);}).join('');
+    rows.push('<tr style="background:var(--card2)"><td class="mono" style="font-weight:700">CARTERA</td>'+c+'</tr>');}
+  body.innerHTML=rows.join('')||'<tr><td style="color:var(--t3)">Sin datos</td></tr>';
+}
+(function(){const r=document.getElementById("bonScenRun");if(r)r.addEventListener("click",runScenarios);
+  const h=document.getElementById("bonScenHor");if(h)h.addEventListener("change",runScenarios);})();
 
 // === INIT ===
 document.getElementById('btnR').addEventListener('click',()=>{bcraLoaded=false;loadTab1();if(document.getElementById('tab2').classList.contains('active'))loadBCRA()});
