@@ -140,6 +140,7 @@ body{transition:background .3s,color .3s}
 <button class="tab active" data-tab="tab1">📊 Mercado</button>
 <button class="tab" data-tab="tab2">🏦 BCRA</button>
 <button class="tab" data-tab="tab3">📈 Activos</button>
+<button class="tab" data-tab="tab7">📊 Histórico</button>
 <button class="tab" data-tab="tab4">🧮 CAPM</button>
 <button class="tab" data-tab="tab5">💵 Dólares</button>
 <button class="tab" data-tab="tab6">📜 Bonos</button>
@@ -153,7 +154,7 @@ body{transition:background .3s,color .3s}
 <div class="kpi a"><div class="kpi-top"><span class="kpi-em">📈</span><span class="badge n" id="bI">—</span></div><div class="kpi-lb">Inflación Mensual</div><div class="kpi-val" id="kI">—</div><div class="kpi-sub" id="kIP">—</div></div>
 <div class="kpi r"><div class="kpi-top"><span class="kpi-em">🌡️</span><span class="badge n" id="bR">—</span></div><div class="kpi-lb">Riesgo País</div><div class="kpi-val" id="kR">—</div><div class="kpi-sub" id="kRF">—</div></div>
 <div class="kpi v"><div class="kpi-top"><span class="kpi-em">📊</span><span class="badge n" id="bBr">—</span></div><div class="kpi-lb">Brecha Cambiaria</div><div class="kpi-val" id="kBr">—</div><div class="kpi-sub">Blue vs Oficial</div></div>
-<div class="kpi o"><div class="kpi-top"><span class="kpi-em">🏦</span><span class="badge n" id="bDep">—</span></div><div class="kpi-lb">Depósitos en USD</div><div class="kpi-val" id="kDep">—</div><div class="kpi-sub" id="kDepF">Sector público y privado</div></div>
+<div class="kpi o"><div class="kpi-top"><span class="kpi-em">🏦</span><span class="badge n" id="bDep">—</span></div><div class="kpi-lb">Depósitos USD (BCRA #107)</div><div class="kpi-val" id="kDep">—</div><div class="kpi-sub" id="kDepF">Depósitos del sector financiero</div></div>
 </div>
 <div class="sec">💱 Cotizaciones del Dólar</div>
 <div class="dgrid" id="dG"></div>
@@ -362,6 +363,54 @@ Armá tu portafolio agregando tickers. El modelo calcula el rendimiento esperado
 <p style="font-size:11px;color:var(--t3);margin-top:10px;font-family:var(--fm)">GD = dólar cable (CCL) · AL/AE/AO = dólar MEP · TIR despejada del precio en su moneda real (índice neto de brecha). Material educativo, no es recomendación.</p>
 </div>
 </div>
+
+<!-- ==================== TAB 7: HISTÓRICO (watchlist + timeline de operaciones) ==================== -->
+<div class="tab-content" id="tab7">
+<div class="sec">📊 Comparación histórica de activos <span class="sec-tag">base 100 · bonos y acciones</span></div>
+<div class="cc f" style="margin-bottom:16px">
+<p style="color:var(--t2);font-size:13px;line-height:1.7;margin-bottom:14px">
+Comparación de evolución de múltiples activos normalizados a <strong>base 100</strong> desde el inicio del período.
+Los marcadores <span style="color:var(--em)">▲ verdes</span> indican compras y los <span style="color:var(--rose)">▼ rojos</span> indican ventas.
+Las operaciones se guardan en tu navegador (localStorage) y no se publican al repo.
+</p>
+<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;margin-bottom:12px">
+<div style="min-width:140px"><label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">TICKER</label>
+<input id="histTicker" type="text" placeholder="Ej: AO27, EWZ, GGAL.BA" style="width:100%;background:var(--bg2);color:var(--t1);border:1px solid var(--brd);padding:10px 14px;border-radius:8px;font-family:var(--fm);font-size:13px;text-transform:uppercase"></div>
+<div style="min-width:140px"><label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">FECHA</label>
+<input id="histFecha" type="date" style="width:100%;background:var(--bg2);color:var(--t1);border:1px solid var(--brd);padding:10px 14px;border-radius:8px;font-family:var(--fm);font-size:13px"></div>
+<div style="min-width:100px"><label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">TIPO</label>
+<select id="histTipo" style="width:100%;background:var(--bg2);color:var(--t1);border:1px solid var(--brd);padding:10px 14px;border-radius:8px;font-family:var(--fb);font-size:13px"><option value="compra">Compra</option><option value="venta">Venta</option></select></div>
+<div style="min-width:120px"><label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">PRECIO (opcional)</label>
+<input id="histPrecio" type="number" step="any" placeholder="auto" style="width:100%;background:var(--bg2);color:var(--t1);border:1px solid var(--brd);padding:10px 14px;border-radius:8px;font-family:var(--fm);font-size:13px"></div>
+<button class="rbtn" id="histAdd" style="height:42px;padding:10px 20px">+ Agregar operación</button>
+<div style="flex:1;min-width:20px"></div>
+<div style="min-width:120px"><label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">PERÍODO</label>
+<select id="histPeriod" style="width:100%;background:var(--bg2);color:var(--t1);border:1px solid var(--brd);padding:10px 14px;border-radius:8px;font-family:var(--fb);font-size:13px">
+<option value="1mo">1 mes</option><option value="3mo">3 meses</option><option value="6mo" selected>6 meses</option><option value="1y">1 año</option><option value="2y">2 años</option><option value="5y">5 años</option>
+</select></div>
+<button class="rbtn" id="histReload" style="height:42px;padding:10px 20px;border-color:var(--sky);color:var(--sky);font-weight:600">⚡ Actualizar gráfico</button>
+</div>
+<div style="display:flex;gap:6px;flex-wrap:wrap">
+<span style="font-size:11px;color:var(--t3);padding:6px 0">Reset:</span>
+<button class="qbtn" id="histResetOps">↻ Volver a operaciones precargadas</button>
+<button class="qbtn" id="histClearAll" style="border-color:var(--rose);color:var(--rose)">🗑️ Limpiar todas las operaciones</button>
+</div>
+</div>
+<div id="histError" class="err" style="display:none"></div>
+<div id="histLoading" class="mini-lo" style="display:none"><div class="spin"></div><p style="margin-top:12px">Descargando precios históricos...</p></div>
+<div class="cc f" id="histChartWrap" style="display:none">
+<div class="ch"><span class="ct" id="histChartTitle">Comparación normalizada base 100</span><span class="ctag" id="histChartTag">6 meses</span></div>
+<div class="cb t" style="height:420px"><canvas id="cHist"></canvas></div>
+</div>
+<div class="sec">📋 Libro de operaciones <span class="sec-tag" id="histOpsCount">0 operaciones</span></div>
+<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fecha</th><th>Ticker</th><th>Tipo</th><th>Precio</th><th>Fuente</th><th></th></tr></thead><tbody id="histOpsBody"></tbody></table></div>
+<p style="font-size:11px;color:var(--t3);margin-top:10px;font-family:var(--fm)">
+Fuente de precios: <strong>data912</strong> para bonos soberanos AR (AO27, AE38, AL41, GD41, etc.) · <strong>Yahoo Finance</strong> para acciones, CEDEARs y ETFs (EWZ, GGAL.BA, etc.).
+Los bonos se grafican en USD (dividiendo por MEP o cable según corresponda). Las acciones en su moneda original.
+TXMD9 y bonos CER no están soportados en este endpoint y se omiten del gráfico.
+</p>
+</div>
+
 <footer class="footer">
 <p>Datos: <a href="https://argentinadatos.com" target="_blank">ArgentinaDatos API</a> · <a href="https://www.bcra.gob.ar/apis-banco-central/" target="_blank">BCRA API</a> — Fuentes: BCRA, INDEC, CAFCI, JP Morgan, Ámbito</p>
 <p style="margin-top:6px">Dashboard generado para fines educativos — Curso Power BI</p>
@@ -414,6 +463,7 @@ document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',()=>{
   if(t.dataset.tab==='tab2'&&!bcraLoaded)loadBCRA();
   if(t.dataset.tab==='tab5'&&!dolLoaded)loadDolares();
   if(t.dataset.tab==='tab6'&&!bonosLoaded)loadBonos();
+  if(t.dataset.tab==='tab7')loadHistorico();
 }));
 
 // === TAB 1: MERCADO ===
@@ -1283,6 +1333,288 @@ function runScenarios(){
 }
 (function(){const r=document.getElementById("bonScenRun");if(r)r.addEventListener("click",runScenarios);
   const h=document.getElementById("bonScenHor");if(h)h.addEventListener("change",runScenarios);})();
+
+// ==================== TAB 7: HISTÓRICO ====================
+// Watchlist de operaciones (compras/ventas) con comparación normalizada base 100.
+// Fuente de precios: data912 para bonos AR, Yahoo Finance para resto.
+
+const HIST_STORAGE_KEY='argmacro_hist_ops_v1';
+// Operaciones precargadas (sin precios ni cantidades, solo fechas y tipos)
+const HIST_DEFAULT_OPS=[
+  {date:'2026-06-05',ticker:'AO27',tipo:'compra'},
+  {date:'2026-06-08',ticker:'AO27',tipo:'compra'},
+  {date:'2026-06-10',ticker:'AE38',tipo:'compra'},
+  {date:'2026-06-17',ticker:'AL41',tipo:'compra'},
+  {date:'2026-06-17',ticker:'GD41',tipo:'compra'},
+  {date:'2026-07-29',ticker:'AO27',tipo:'venta'},
+  {date:'2026-08-04',ticker:'AO27',tipo:'venta'},
+  {date:'2026-08-06',ticker:'AO27',tipo:'venta'},
+  {date:'2026-08-28',ticker:'AE38',tipo:'venta'},
+  {date:'2026-09-08',ticker:'AE38',tipo:'venta'},
+  {date:'2026-09-18',ticker:'GD41',tipo:'venta'},
+  {date:'2026-09-18',ticker:'TXMD9',tipo:'compra'},
+  {date:'2026-10-27',ticker:'AE38',tipo:'compra'},
+  {date:'2026-10-27',ticker:'EWZ',tipo:'compra'}
+];
+// Mapeo de bonos AR conocidos a su mercado de cotización (CCL o MEP)
+const HIST_AR_BONDS={GD41:'CCL',GD30:'CCL',GD35:'CCL',GD38:'CCL',GD46:'CCL',AL41:'MEP',AL30:'MEP',AL35:'MEP',AE38:'MEP',AO27:'MEP',AO20:'MEP'};
+// Colores por ticker (persistentes para el gráfico)
+const HIST_COLORS=['#2563eb','#d97706','#7c3aed','#059669','#dc2626','#0891b2','#ea580c','#be123c','#4338ca','#15803d','#9333ea','#0d9488'];
+
+let histOps=[];
+let cHist=null;
+let histLoaded=false;
+
+function histLoadOps(){
+  try{const raw=localStorage.getItem(HIST_STORAGE_KEY);
+    if(raw){const parsed=JSON.parse(raw);if(Array.isArray(parsed)){histOps=parsed;return;}}}
+  catch(e){console.warn('No se pudo leer histOps de localStorage:',e);}
+  histOps=HIST_DEFAULT_OPS.map(o=>Object.assign({},o));
+}
+function histSaveOps(){try{localStorage.setItem(HIST_STORAGE_KEY,JSON.stringify(histOps));}catch(e){console.warn('No se pudo guardar histOps:',e);}}
+
+function histIsArBond(tk){return HIST_AR_BONDS.hasOwnProperty(tk.toUpperCase());}
+function histTickerSource(tk){return histIsArBond(tk)?'data912':'yahoo';}
+
+function histPeriodDays(p){const map={'1mo':30,'3mo':90,'6mo':180,'1y':365,'2y':730,'5y':1825};return map[p]||180;}
+function histPeriodLabel(p){const map={'1mo':'1 mes','3mo':'3 meses','6mo':'6 meses','1y':'1 año','2y':'2 años','5y':'5 años'};return map[p]||p;}
+
+// Descarga histórico de un bono AR vía data912 y devuelve {date→priceUsd}
+async function histFetchArBond(tk){
+  const market=HIST_AR_BONDS[tk.toUpperCase()];
+  const hist=await fetchD912('/historical/bonds/'+tk);
+  // Obtener series históricas de FX (MEP y CCL) desde argentinadatos
+  const casas=await fetchAPI('/cotizaciones/dolares');
+  const fxName=market==='CCL'?'contadoconliqui':'bolsa';
+  const fxH={};casas.filter(c=>c.casa===fxName).forEach(c=>{fxH[c.fecha]=c.venta;});
+  const out={};
+  hist.forEach(h=>{const f=(h.date||'').slice(0,10);const fx=fxH[f];if(fx&&h.c)out[f]=h.c/fx;});
+  return out;
+}
+
+// Descarga histórico de Yahoo Finance y devuelve {date→priceClose}
+async function histFetchYahoo(tk,period){
+  const url='https://query2.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(tk)+'?range='+period+'&interval=1d';
+  const data=await fetchYF(url);
+  if(!data.chart||!data.chart.result||!data.chart.result[0])throw new Error('Yahoo: ticker no encontrado: '+tk);
+  const result=data.chart.result[0];
+  const ts=result.timestamp||[];
+  const closes=result.indicators.quote[0].close||[];
+  const out={};
+  for(let i=0;i<ts.length;i++){const d=new Date(ts[i]*1000).toISOString().slice(0,10);if(closes[i]!=null)out[d]=closes[i];}
+  return out;
+}
+
+// Descarga serie para un ticker, cacheando por sesión
+const _histCache={};
+async function histFetchSeries(tk,period){
+  const key=tk+'|'+period;
+  if(_histCache[key])return _histCache[key];
+  const src=histTickerSource(tk);
+  let series;
+  if(src==='data912'){series=await histFetchArBond(tk);}
+  else{series=await histFetchYahoo(tk,period);}
+  _histCache[key]=series;return series;
+}
+
+// Filtra una serie {date→price} por rango de días desde hoy
+function histFilterByPeriod(series,days){
+  const cutoff=new Date();cutoff.setDate(cutoff.getDate()-days);
+  const cutStr=cutoff.toISOString().slice(0,10);
+  const out={};
+  for(const d in series){if(d>=cutStr)out[d]=series[d];}
+  return out;
+}
+
+// Normaliza una serie a base 100 desde el primer valor
+function histNormalize(series){
+  const dates=Object.keys(series).sort();
+  if(!dates.length)return{};
+  const base=series[dates[0]];
+  if(!base||base===0)return{};
+  const out={};
+  dates.forEach(d=>{out[d]=series[d]/base*100;});
+  return out;
+}
+
+async function histRenderChart(){
+  document.getElementById('histError').style.display='none';
+  const period=document.getElementById('histPeriod').value;
+  const days=histPeriodDays(period);
+  const tickers=[...new Set(histOps.map(o=>o.ticker.toUpperCase()))];
+  if(!tickers.length){
+    document.getElementById('histChartWrap').style.display='none';
+    return;
+  }
+  document.getElementById('histLoading').style.display='block';
+  document.getElementById('histChartWrap').style.display='none';
+  const seriesByTk={};const skipped=[];
+  for(const tk of tickers){
+    try{const s=await histFetchSeries(tk,period);
+      const filtered=histFilterByPeriod(s,days);
+      if(Object.keys(filtered).length<2){skipped.push(tk+' (sin datos en el período)');continue;}
+      seriesByTk[tk]=histNormalize(filtered);
+    }catch(e){console.warn('Fallo serie '+tk+':',e);skipped.push(tk+' ('+e.message+')');}
+  }
+  document.getElementById('histLoading').style.display='none';
+  if(!Object.keys(seriesByTk).length){
+    const err=document.getElementById('histError');
+    err.innerHTML='⚠ No se pudieron cargar datos para ningún ticker.<br>'+(skipped.length?'Omitidos: '+skipped.join(', '):'');
+    err.style.display='block';return;
+  }
+  // Unificar fechas: eje x = unión de todas las fechas, ordenadas
+  const allDates=new Set();
+  Object.values(seriesByTk).forEach(s=>{for(const d in s)allDates.add(d);});
+  const dates=[...allDates].sort();
+  // Preparar operaciones por ticker (para marcadores)
+  const opsByTk={};
+  histOps.forEach(o=>{const tk=o.ticker.toUpperCase();if(!opsByTk[tk])opsByTk[tk]=[];opsByTk[tk].push(o);});
+  // Build datasets
+  const datasets=[];
+  const theme=document.documentElement.classList.contains('dark');
+  Object.entries(seriesByTk).forEach(([tk,s],i)=>{
+    const color=HIST_COLORS[i%HIST_COLORS.length];
+    const data=dates.map(d=>s[d]!=null?s[d]:null);
+    // Línea principal
+    datasets.push({label:tk,data,borderColor:color,backgroundColor:color,tension:.2,pointRadius:0,pointHoverRadius:4,borderWidth:2,spanGaps:true});
+    // Marcadores de operaciones: una por evento
+    const ops=opsByTk[tk]||[];
+    const pointData=dates.map(d=>null);
+    const pointColors=dates.map(d=>'transparent');
+    const pointStyles=dates.map(d=>'circle');
+    const pointSizes=dates.map(d=>0);
+    const pointBorders=dates.map(d=>'transparent');
+    const opInfo=dates.map(d=>null);
+    ops.forEach(op=>{
+      // Encontrar la fecha más cercana >= op.date en el eje
+      let idx=dates.findIndex(d=>d>=op.date);
+      if(idx===-1)return;// op fuera del rango (más reciente que todo)
+      const d=dates[idx];
+      if(s[d]==null)return;
+      pointData[idx]=s[d];
+      pointColors[idx]=op.tipo==='compra'?'#059669':'#dc2626';
+      pointStyles[idx]=op.tipo==='compra'?'triangle':'triangle';
+      pointSizes[idx]=9;
+      pointBorders[idx]='#fff';
+      opInfo[idx]={ticker:tk,tipo:op.tipo,date:op.date,precio:op.precio};
+    });
+    if(pointData.some(x=>x!=null)){
+      datasets.push({
+        label:tk+' ops',
+        data:pointData,
+        type:'line',
+        borderColor:'transparent',
+        backgroundColor:'transparent',
+        pointBackgroundColor:pointColors,
+        pointBorderColor:pointBorders,
+        pointStyle:pointStyles,
+        pointRadius:pointSizes,
+        pointHoverRadius:pointSizes.map(s=>s>0?s+3:0),
+        pointBorderWidth:2,
+        showLine:false,
+        _opInfo:opInfo,
+        _parentTicker:tk
+      });
+    }
+  });
+  if(cHist)cHist.destroy();
+  cHist=new Chart(document.getElementById('cHist'),{
+    type:'line',
+    data:{labels:dates,datasets:datasets},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{
+        legend:{
+          labels:{usePointStyle:true,boxWidth:8,font:{size:11},filter:(item)=>!item.text.endsWith(' ops')}
+        },
+        tooltip:{...tt,callbacks:{
+          title:(items)=>items[0].label,
+          label:(ctx)=>{
+            const ds=ctx.dataset;
+            if(ds._opInfo){
+              const op=ds._opInfo[ctx.dataIndex];
+              if(!op)return null;
+              const emoji=op.tipo==='compra'?'▲ COMPRA':'▼ VENTA';
+              let s=emoji+' '+op.ticker+' @ '+op.date+' · índice '+ctx.parsed.y.toFixed(1);
+              if(op.precio)s+=' · precio '+op.precio;
+              return s;
+            }
+            if(ctx.parsed.y==null)return null;
+            return ds.label+': '+ctx.parsed.y.toFixed(1);
+          }
+        }}
+      },
+      scales:{
+        y:{title:{display:true,text:'Índice (base 100 al inicio del período)'},grid:{color:'rgba(0,0,0,.06)'}},
+        x:{grid:{display:false},ticks:{maxTicksLimit:12,font:{size:10}}}
+      }
+    }
+  });
+  document.getElementById('histChartWrap').style.display='block';
+  document.getElementById('histChartTag').textContent=histPeriodLabel(period)+(skipped.length?' · omitidos: '+skipped.length:'');
+}
+
+function histRenderOpsTable(){
+  const tb=document.getElementById('histOpsBody');
+  if(!histOps.length){tb.innerHTML='<tr><td colspan="6" style="color:var(--t3)">Sin operaciones. Agregá una arriba o restaurá las operaciones precargadas.</td></tr>';
+    document.getElementById('histOpsCount').textContent='0 operaciones';return;}
+  // Ordenar por fecha descendente
+  const sorted=[...histOps].sort((a,b)=>b.date.localeCompare(a.date));
+  tb.innerHTML=sorted.map((op)=>{
+    const idx=histOps.indexOf(op);
+    const emoji=op.tipo==='compra'?'<span class="grn">▲ Compra</span>':'<span class="rs">▼ Venta</span>';
+    const src=histTickerSource(op.ticker);
+    const srcLabel=src==='data912'?'<span class="acc">data912</span>':'Yahoo';
+    const precioLabel=op.precio?('<span class="mono">'+op.precio+'</span>'):'<span style="color:var(--t3)">—</span>';
+    return '<tr><td class="mono">'+op.date+'</td><td class="mono" style="font-weight:700">'+op.ticker+'</td><td>'+emoji+'</td><td>'+precioLabel+'</td><td>'+srcLabel+'</td><td><button class="rbtn" style="padding:4px 10px;font-size:11px" onclick="histRemoveOp('+idx+')">✕</button></td></tr>';
+  }).join('');
+  document.getElementById('histOpsCount').textContent=histOps.length+' operación'+(histOps.length===1?'':'es');
+}
+
+function histRemoveOp(i){histOps.splice(i,1);histSaveOps();histRenderOpsTable();histRenderChart();}
+
+async function loadHistorico(){
+  if(!histLoaded){
+    histLoadOps();
+    // Default date: today
+    const today=new Date().toISOString().slice(0,10);
+    document.getElementById('histFecha').value=today;
+    // Event listeners
+    document.getElementById('histAdd').addEventListener('click',()=>{
+      const tk=(document.getElementById('histTicker').value||'').trim().toUpperCase();
+      const date=document.getElementById('histFecha').value;
+      const tipo=document.getElementById('histTipo').value;
+      const precioRaw=document.getElementById('histPrecio').value;
+      if(!tk||!date){alert('Faltan ticker o fecha');return;}
+      const op={date,ticker:tk,tipo};
+      if(precioRaw)op.precio=parseFloat(precioRaw);
+      histOps.push(op);histSaveOps();
+      document.getElementById('histTicker').value='';
+      document.getElementById('histPrecio').value='';
+      // Invalidar caché para ese ticker (para que recargue si cambió el período)
+      Object.keys(_histCache).forEach(k=>{if(k.startsWith(tk+'|'))delete _histCache[k];});
+      histRenderOpsTable();histRenderChart();
+    });
+    document.getElementById('histReload').addEventListener('click',()=>{
+      // Invalidar todo el caché al cambiar período
+      Object.keys(_histCache).forEach(k=>delete _histCache[k]);
+      histRenderChart();
+    });
+    document.getElementById('histResetOps').addEventListener('click',()=>{
+      if(!confirm('Esto va a reemplazar tus operaciones por las operaciones precargadas. ¿Continuar?'))return;
+      histOps=HIST_DEFAULT_OPS.map(o=>Object.assign({},o));
+      histSaveOps();histRenderOpsTable();histRenderChart();
+    });
+    document.getElementById('histClearAll').addEventListener('click',()=>{
+      if(!confirm('Esto va a borrar TODAS las operaciones. ¿Continuar?'))return;
+      histOps=[];histSaveOps();histRenderOpsTable();histRenderChart();
+    });
+    histLoaded=true;
+  }
+  histRenderOpsTable();
+  await histRenderChart();
+}
 
 // === INIT ===
 document.getElementById('btnR').addEventListener('click',()=>{bcraLoaded=false;loadTab1();if(document.getElementById('tab2').classList.contains('active'))loadBCRA()});
