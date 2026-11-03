@@ -430,22 +430,40 @@ TXMD9 y bonos CER no están soportados en este endpoint y se omiten del gráfico
 // === CONFIG ===
 const API_BASE='https://api.argentinadatos.com/v1';
 const BCRA_BASE='https://api.bcra.gob.ar/estadisticas/v4.0';
-const PROXIES=[(u)=>'https://corsproxy.io/?'+encodeURIComponent(u),(u)=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u)];
+// Lista extendida de proxies CORS. Si uno cae, probamos el siguiente.
+// Última actualización: 2026-11 (corsproxy.io empezó a devolver 403, allorigins intermitente)
+const PROXIES=[
+  {name:'thingproxy',    fn:(u)=>'https://thingproxy.freeboard.io/fetch/'+u},
+  {name:'corsproxy.io',  fn:(u)=>'https://corsproxy.io/?'+encodeURIComponent(u)},
+  {name:'allorigins',    fn:(u)=>'https://api.allorigins.win/raw?url='+encodeURIComponent(u)},
+  {name:'codetabs',      fn:(u)=>'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(u)},
+  {name:'cors.sh',       fn:(u)=>'https://proxy.cors.sh/'+u},
+];
 const HIDE_CASAS=['solidario'];
 let connMode='detecting';
+// Recordar entre sesiones qué proxy funcionó la última vez (empezamos por ese)
+let _preferredProxy=null;
+try{_preferredProxy=parseInt(localStorage.getItem('argmacro_proxy_idx'));if(isNaN(_preferredProxy)||_preferredProxy<0||_preferredProxy>=PROXIES.length)_preferredProxy=null;}catch(e){}
+function _rememberProxy(i){try{localStorage.setItem('argmacro_proxy_idx',String(i));}catch(e){}_preferredProxy=i;}
+function _proxyOrder(){
+  // Ordena los índices de proxies para probar primero el preferido, luego el resto en orden
+  const order=PROXIES.map((_,i)=>i);
+  if(_preferredProxy!=null){order.splice(order.indexOf(_preferredProxy),1);order.unshift(_preferredProxy);}
+  return order;
+}
 
 // === FETCH HELPERS ===
 async function tryF(url){const r=await fetch(url,{redirect:'follow'});if(!r.ok)throw new Error('HTTP '+r.status);return r.json()}
 async function fetchAPI(ep){
   const urls=[API_BASE+ep,API_BASE+ep+'/'];
   if(connMode==='direct'||connMode==='detecting'){for(const u of urls){try{const d=await tryF(u);connMode='direct';return d}catch(e){continue}}}
-  for(let p=0;p<PROXIES.length;p++){for(const u of urls){try{const d=await tryF(PROXIES[p](u));connMode='proxy-'+p;return d}catch(e){continue}}}
+  for(const p of _proxyOrder()){for(const u of urls){try{const d=await tryF(PROXIES[p].fn(u));connMode='proxy-'+p;_rememberProxy(p);return d}catch(e){continue}}}
   throw new Error('No se pudo conectar.');
 }
 async function fetchBCRA(ep){
   const url=BCRA_BASE+ep;
   try{const d=await tryF(url);return d}catch(e){}
-  for(let p=0;p<PROXIES.length;p++){try{return await tryF(PROXIES[p](url))}catch(e){continue}}
+  for(const p of _proxyOrder()){try{const d=await tryF(PROXIES[p].fn(url));_rememberProxy(p);return d}catch(e){continue}}
   throw new Error('No se pudo conectar al BCRA.');
 }
 
@@ -460,7 +478,11 @@ function hlo(){document.getElementById('lo').classList.add('h')}
 function updConn(){
   const el=document.getElementById('conn'),st=document.getElementById('stxt');
   if(connMode==='direct'){el.innerHTML='Conexión: <span>Directa</span>';st.textContent='Conectado'}
-  else{const n=connMode==='proxy-0'?'corsproxy.io':'allorigins.win';el.innerHTML='Conexión vía <span>'+n+'</span>';st.textContent='Via proxy'}
+  else{
+    const m=/^proxy-(\d+)$/.exec(connMode);
+    const n=(m&&PROXIES[+m[1]])?PROXIES[+m[1]].name:'proxy';
+    el.innerHTML='Conexión vía <span>'+n+'</span>';st.textContent='Via proxy';
+  }
 }
 function mn(f){if(!f)return'';const[y,m]=f.split('-');const n=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];return n[parseInt(m)-1]+' '+y.slice(2)}
 
@@ -638,7 +660,7 @@ async function checkApiServer(){
 checkApiServer();
 
 async function fetchYF(url){
-  for(let p=0;p<PROXIES.length;p++){try{const r=await fetch(PROXIES[p](url));if(!r.ok)throw new Error('HTTP '+r.status);return await r.json()}catch(e){continue}}
+  for(const p of _proxyOrder()){try{const r=await fetch(PROXIES[p].fn(url));if(!r.ok)throw new Error('HTTP '+r.status);const d=await r.json();_rememberProxy(p);return d;}catch(e){continue}}
   throw new Error('No se pudo conectar a Yahoo Finance');
 }
 
@@ -831,7 +853,7 @@ document.querySelectorAll('.capmq').forEach(b=>b.addEventListener('click',()=>{
 
 async function fetchYFChart(ticker,range){
   const url='https://query2.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(ticker)+'?range='+range+'&interval=1d';
-  for(let p=0;p<PROXIES.length;p++){try{const r=await fetch(PROXIES[p](url));if(!r.ok)continue;return await r.json()}catch(e){continue}}
+  for(const p of _proxyOrder()){try{const r=await fetch(PROXIES[p].fn(url));if(!r.ok)continue;const d=await r.json();_rememberProxy(p);return d;}catch(e){continue}}
   throw new Error('No se pudo obtener datos para '+ticker);
 }
 
@@ -1158,7 +1180,7 @@ let bonosLoaded=false,cBonCurve,cBonIdx;
 let bonByTk={},bonHoldings=[];
 
 async function fetchD912(ep){
-  for(let p=0;p<PROXIES.length;p++){try{const r=await fetch(PROXIES[p](D912+ep));if(r.ok)return await r.json()}catch(e){}}
+  for(const p of _proxyOrder()){try{const r=await fetch(PROXIES[p].fn(D912+ep));if(r.ok){const d=await r.json();_rememberProxy(p);return d;}}catch(e){}}
   try{const r=await fetch(D912+ep);if(r.ok)return await r.json()}catch(e){}
   throw new Error('data912 no responde ('+ep+')');
 }
@@ -1230,6 +1252,7 @@ async function loadBonIndex(MEP,CCL){
   const series={};
   for(const[tk,cfg]of Object.entries(BON_INSTR)){
     let hist;try{hist=await fetchD912('/historical/bonds/'+tk)}catch(e){continue}
+    if(!Array.isArray(hist)){console.warn('[bonos] hist no es array para '+tk,hist);continue;}
     const fxH=cfg.cur==='CCL'?cclH:mepH;
     const m={};hist.forEach(h=>{const f=(h.date||'').slice(0,10);const fx=fxH[f];if(fx&&h.c)m[f]=h.c/fx;});
     series[tk]=m;
@@ -1396,8 +1419,10 @@ function histPeriodLabel(p){const map={'1mo':'1 mes','3mo':'3 meses','6mo':'6 me
 async function histFetchArBond(tk){
   const market=HIST_AR_BONDS[tk.toUpperCase()];
   const hist=await fetchD912('/historical/bonds/'+tk);
+  if(!Array.isArray(hist))throw new Error('data912 devolvió formato inesperado para '+tk);
   // Obtener series históricas de FX (MEP y CCL) desde argentinadatos
   const casas=await fetchAPI('/cotizaciones/dolares');
+  if(!Array.isArray(casas))throw new Error('No se pudo obtener FX histórico (argentinadatos)');
   const fxName=market==='CCL'?'contadoconliqui':'bolsa';
   const fxH={};casas.filter(c=>c.casa===fxName).forEach(c=>{fxH[c.fecha]=c.venta;});
   const out={};
@@ -1577,20 +1602,43 @@ async function histFetchLastPrice(tk){
   if(tk in _histLastPrice)return _histLastPrice[tk];
   try{
     if(histIsArBond(tk)){
-      // Bonos AR: usamos /live/arg_bonds que devuelve [{symbol,c,...}]
+      // Bonos AR: /live/arg_bonds devuelve [{symbol,c,...}] (bonos soberanos USD)
       const data=await fetchD912('/live/arg_bonds');
       const row=(data||[]).find(x=>(x.symbol||'').toUpperCase()===tk);
       _histLastPrice[tk]=row?row.c:null;
+      if(!row)console.info('[hist] '+tk+' no está en /live/arg_bonds');
     }else{
-      // Yahoo: último cierre del rango 5d
-      const url='https://query2.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(tk)+'?range=5d&interval=1d';
-      const data=await fetchYF(url);
-      const result=data?.chart?.result?.[0];
-      const closes=result?.indicators?.quote?.[0]?.close||[];
-      const last=[...closes].reverse().find(v=>v!=null);
-      _histLastPrice[tk]=last||null;
+      // Para acciones/ETFs: primero API local (yfinance server-side), fallback a Yahoo via proxy
+      let last=null;
+      // Intento 1: API local si está disponible
+      if(apiServerAvailable===null){try{await checkApiServer();}catch(e){}}
+      if(apiServerAvailable){
+        try{
+          const data=await fetchLocal('/ticker/'+encodeURIComponent(tk)+'?period=5d');
+          if(data&&!data.error){
+            // Buscar último precio en el formato que devuelva el server
+            last=data.last_price||data.price||data.regularMarketPrice||(data.history&&data.history.length?data.history[data.history.length-1].close:null);
+          }
+        }catch(e){console.info('[hist] API local falló para '+tk+':',e.message);}
+      }
+      // Intento 2: Yahoo via proxy CORS
+      if(last==null){
+        const url='https://query2.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(tk)+'?range=5d&interval=1d';
+        const data=await fetchYF(url);
+        const result=data?.chart?.result?.[0];
+        if(result){
+          // Preferir meta.regularMarketPrice (más actualizado), fallback a último close
+          last=result.meta?.regularMarketPrice;
+          if(last==null){
+            const closes=result.indicators?.quote?.[0]?.close||[];
+            last=[...closes].reverse().find(v=>v!=null);
+          }
+        }
+      }
+      _histLastPrice[tk]=last!=null?last:null;
+      if(last==null)console.info('[hist] Yahoo no devolvió precio para '+tk);
     }
-  }catch(e){console.warn('No se pudo obtener precio actual de '+tk+':',e);_histLastPrice[tk]=null;}
+  }catch(e){console.warn('[hist] Error al obtener precio actual de '+tk+':',e.message||e);_histLastPrice[tk]=null;}
   return _histLastPrice[tk];
 }
 
@@ -1624,7 +1672,18 @@ function histRenderPivot(){
   const paint=(lastPrices)=>{
     head.innerHTML='<tr><th style="width:200px">Métrica</th>'+tickers.map(tk=>'<th class="num mono" style="font-weight:700">'+tk+'</th>').join('')+'</tr>';
     const buyCells=tickers.map(tk=>{const v=histAvgBuyPrice(tk);return v==null?'<td class="num" style="color:var(--t3)">—</td>':'<td class="num mono">'+v.toLocaleString('es-AR',{maximumFractionDigits:2})+'</td>';});
-    const nowCells=tickers.map(tk=>{const v=lastPrices?lastPrices[tk]:undefined;if(v===undefined)return '<td class="num" style="color:var(--t3)">cargando…</td>';if(v==null)return '<td class="num" style="color:var(--t3)">—</td>';return '<td class="num mono">'+v.toLocaleString('es-AR',{maximumFractionDigits:2})+'</td>';});
+    const nowCells=tickers.map(tk=>{
+      const v=lastPrices?lastPrices[tk]:undefined;
+      if(v===undefined)return '<td class="num" style="color:var(--t3)">cargando…</td>';
+      if(v==null){
+        // Distinguir entre "no soportado por la fuente" y "falló la consulta"
+        const upper=tk.toUpperCase();
+        if(upper==='TXMD9'||upper.startsWith('TX')||upper.startsWith('T2')||upper.startsWith('T3')||upper.startsWith('T4')||upper.startsWith('T5'))
+          return '<td class="num" style="color:var(--t3)" title="Los bonos CER / dual Tesoro no están en /live/arg_bonds de data912">s/d</td>';
+        return '<td class="num" style="color:var(--t3)">—</td>';
+      }
+      return '<td class="num mono">'+v.toLocaleString('es-AR',{maximumFractionDigits:2})+'</td>';
+    });
     const varCells=tickers.map(tk=>{
       const buy=histAvgBuyPrice(tk);const now=lastPrices?lastPrices[tk]:undefined;
       if(now===undefined)return '<td class="num" style="color:var(--t3)">—</td>';
