@@ -380,8 +380,10 @@ Las operaciones se guardan en tu navegador (localStorage) y no se publican al re
 <input id="histFecha" type="date" style="width:100%;background:var(--bg2);color:var(--t1);border:1px solid var(--brd);padding:10px 14px;border-radius:8px;font-family:var(--fm);font-size:13px"></div>
 <div style="min-width:100px"><label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">TIPO</label>
 <select id="histTipo" style="width:100%;background:var(--bg2);color:var(--t1);border:1px solid var(--brd);padding:10px 14px;border-radius:8px;font-family:var(--fb);font-size:13px"><option value="compra">Compra</option><option value="venta">Venta</option></select></div>
-<div style="min-width:120px"><label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">PRECIO (opcional)</label>
-<input id="histPrecio" type="number" step="any" placeholder="auto" style="width:100%;background:var(--bg2);color:var(--t1);border:1px solid var(--brd);padding:10px 14px;border-radius:8px;font-family:var(--fm);font-size:13px"></div>
+<div style="min-width:120px"><label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">PRECIO</label>
+<input id="histPrecio" type="number" step="any" placeholder="por 100 VN" style="width:100%;background:var(--bg2);color:var(--t1);border:1px solid var(--brd);padding:10px 14px;border-radius:8px;font-family:var(--fm);font-size:13px"></div>
+<div style="min-width:110px"><label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">PESO</label>
+<input id="histPeso" type="number" step="any" placeholder="0.05 = 5%" style="width:100%;background:var(--bg2);color:var(--t1);border:1px solid var(--brd);padding:10px 14px;border-radius:8px;font-family:var(--fm);font-size:13px"></div>
 <button class="rbtn" id="histAdd" style="height:42px;padding:10px 20px">+ Agregar operación</button>
 <div style="flex:1;min-width:20px"></div>
 <div style="min-width:120px"><label style="font-size:11px;color:var(--t3);display:block;margin-bottom:4px">PERÍODO</label>
@@ -402,8 +404,15 @@ Las operaciones se guardan en tu navegador (localStorage) y no se publican al re
 <div class="ch"><span class="ct" id="histChartTitle">Comparación normalizada base 100</span><span class="ctag" id="histChartTag">6 meses</span></div>
 <div class="cb t" style="height:420px"><canvas id="cHist"></canvas></div>
 </div>
+<div class="sec">💰 Precios: compra vs. hoy <span class="sec-tag" id="histPivotTag">—</span></div>
+<div class="tbl-wrap"><table class="tbl" id="histPivotTbl"><thead id="histPivotHead"></thead><tbody id="histPivotBody"></tbody></table></div>
+<p style="font-size:11px;color:var(--t3);margin-top:8px;font-family:var(--fm)">
+Valor de compra = promedio ponderado por <code>peso</code> de todas las compras del ticker (precio por lámina de 100 VN para bonos AR).
+Valor hoy = último cierre disponible desde data912 (bonos) o Yahoo (resto).
+Variación = (hoy / compra − 1) × 100.
+</p>
 <div class="sec">📋 Libro de operaciones <span class="sec-tag" id="histOpsCount">0 operaciones</span></div>
-<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fecha</th><th>Ticker</th><th>Tipo</th><th>Precio</th><th>Fuente</th><th></th></tr></thead><tbody id="histOpsBody"></tbody></table></div>
+<div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fecha</th><th>Ticker</th><th>Tipo</th><th>Precio</th><th>Peso</th><th>Fuente</th><th></th></tr></thead><tbody id="histOpsBody"></tbody></table></div>
 <p style="font-size:11px;color:var(--t3);margin-top:10px;font-family:var(--fm)">
 Fuente de precios: <strong>data912</strong> para bonos soberanos AR (AO27, AE38, AL41, GD41, etc.) · <strong>Yahoo Finance</strong> para acciones, CEDEARs y ETFs (EWZ, GGAL.BA, etc.).
 Los bonos se grafican en USD (dividiendo por MEP o cable según corresponda). Las acciones en su moneda original.
@@ -1339,22 +1348,26 @@ function runScenarios(){
 // Fuente de precios: data912 para bonos AR, Yahoo Finance para resto.
 
 const HIST_STORAGE_KEY='argmacro_hist_ops_v1';
-// Operaciones precargadas (sin precios ni cantidades, solo fechas y tipos)
+// Operaciones precargadas con precio (por lámina de 100 VN) y ponderación (peso de la operación en el portafolio)
 const HIST_DEFAULT_OPS=[
-  {date:'2026-06-05',ticker:'AO27',tipo:'compra'},
-  {date:'2026-06-08',ticker:'AO27',tipo:'compra'},
-  {date:'2026-06-10',ticker:'AE38',tipo:'compra'},
-  {date:'2026-06-17',ticker:'AL41',tipo:'compra'},
-  {date:'2026-06-17',ticker:'GD41',tipo:'compra'},
-  {date:'2026-07-29',ticker:'AO27',tipo:'venta'},
-  {date:'2026-08-04',ticker:'AO27',tipo:'venta'},
-  {date:'2026-08-06',ticker:'AO27',tipo:'venta'},
-  {date:'2026-08-28',ticker:'AE38',tipo:'venta'},
-  {date:'2026-09-08',ticker:'AE38',tipo:'venta'},
-  {date:'2026-09-18',ticker:'GD41',tipo:'venta'},
-  {date:'2026-09-18',ticker:'TXMD9',tipo:'compra'},
-  {date:'2026-10-27',ticker:'AE38',tipo:'compra'},
-  {date:'2026-10-27',ticker:'EWZ',tipo:'compra'}
+  {date:'2026-06-05',ticker:'AO27',tipo:'compra',precio:149348.5873,peso:0.0671},
+  {date:'2026-06-08',ticker:'AO27',tipo:'compra',precio:149544.2046,peso:0.0678},
+  {date:'2026-06-10',ticker:'AE38',tipo:'compra',precio:117742.4254,peso:0.0993},
+  {date:'2026-06-17',ticker:'AL41',tipo:'compra',precio:110049.4342,peso:0.0578},
+  {date:'2026-06-17',ticker:'GD41',tipo:'compra',precio:113263.4237,peso:0.1731},
+  {date:'2026-07-29',ticker:'AO27',tipo:'venta', precio:157604,     peso:0.0621},
+  {date:'2026-08-04',ticker:'AO27',tipo:'venta', precio:155948,     peso:0.0409},
+  {date:'2026-08-06',ticker:'AO27',tipo:'venta', precio:155277,     peso:0.0385},
+  {date:'2026-08-28',ticker:'AE38',tipo:'venta', precio:120649.9475,peso:0.0571},
+  {date:'2026-09-08',ticker:'AE38',tipo:'venta', precio:120831.9828,peso:0.0248},
+  {date:'2026-09-18',ticker:'GD41',tipo:'venta', precio:111695.4314,peso:0.107 },
+  {date:'2026-09-18',ticker:'TXMD9',tipo:'compra',precio:87.82999994,peso:0.1068},
+  {date:'2026-10-27',ticker:'AE38',tipo:'compra',precio:111695.3156,peso:0.0184},
+  {date:'2026-10-27',ticker:'EWZ', tipo:'compra',precio:28860,      peso:0.0182},
+  {date:'2026-11-02',ticker:'AL41',tipo:'venta', precio:97960.45589,peso:0.0258},
+  {date:'2026-11-02',ticker:'AL41',tipo:'venta', precio:97960.46983,peso:0.0099},
+  {date:'2026-11-02',ticker:'EWZ', tipo:'compra',precio:26842.08486,peso:0.0254},
+  {date:'2026-11-02',ticker:'AE38',tipo:'compra',precio:117742,     peso:0.107 }
 ];
 // Mapeo de bonos AR conocidos a su mercado de cotización (CCL o MEP)
 const HIST_AR_BONDS={GD41:'CCL',GD30:'CCL',GD35:'CCL',GD38:'CCL',GD46:'CCL',AL41:'MEP',AL30:'MEP',AL35:'MEP',AE38:'MEP',AO27:'MEP',AO20:'MEP'};
@@ -1555,9 +1568,90 @@ async function histRenderChart(){
   document.getElementById('histChartTag').textContent=histPeriodLabel(period)+(skipped.length?' · omitidos: '+skipped.length:'');
 }
 
+function histFmtPrecio(v){if(v==null)return '<span style="color:var(--t3)">—</span>';return '<span class="mono">'+Number(v).toLocaleString('es-AR',{maximumFractionDigits:4})+'</span>';}
+function histFmtPeso(v){if(v==null)return '<span style="color:var(--t3)">—</span>';return '<span class="mono">'+(Number(v)*100).toFixed(2)+'%</span>';}
+
+// Precio actual (último dato) por ticker, con caché por sesión
+const _histLastPrice={};
+async function histFetchLastPrice(tk){
+  if(tk in _histLastPrice)return _histLastPrice[tk];
+  try{
+    if(histIsArBond(tk)){
+      // Bonos AR: usamos /live/arg_bonds que devuelve [{symbol,c,...}]
+      const data=await fetchD912('/live/arg_bonds');
+      const row=(data||[]).find(x=>(x.symbol||'').toUpperCase()===tk);
+      _histLastPrice[tk]=row?row.c:null;
+    }else{
+      // Yahoo: último cierre del rango 5d
+      const url='https://query2.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(tk)+'?range=5d&interval=1d';
+      const data=await fetchYF(url);
+      const result=data?.chart?.result?.[0];
+      const closes=result?.indicators?.quote?.[0]?.close||[];
+      const last=[...closes].reverse().find(v=>v!=null);
+      _histLastPrice[tk]=last||null;
+    }
+  }catch(e){console.warn('No se pudo obtener precio actual de '+tk+':',e);_histLastPrice[tk]=null;}
+  return _histLastPrice[tk];
+}
+
+// Promedio ponderado de compras por ticker. Si falta peso, cae a promedio simple.
+function histAvgBuyPrice(tk){
+  const buys=histOps.filter(o=>o.ticker.toUpperCase()===tk.toUpperCase()&&o.tipo==='compra'&&o.precio!=null);
+  if(!buys.length)return null;
+  const hasWeights=buys.every(o=>o.peso!=null&&o.peso>0);
+  if(hasWeights){
+    const num=buys.reduce((s,o)=>s+o.precio*o.peso,0);
+    const den=buys.reduce((s,o)=>s+o.peso,0);
+    return den>0?num/den:null;
+  }
+  // Promedio simple como fallback
+  return buys.reduce((s,o)=>s+o.precio,0)/buys.length;
+}
+
+// Renderiza el pivot inmediatamente con los precios de compra (síncrono)
+// y actualiza los precios actuales en segundo plano (async).
+function histRenderPivot(){
+  const head=document.getElementById('histPivotHead');
+  const body=document.getElementById('histPivotBody');
+  const tag=document.getElementById('histPivotTag');
+  const tickers=[...new Set(histOps.map(o=>o.ticker.toUpperCase()))];
+  if(!tickers.length){
+    head.innerHTML='';body.innerHTML='<tr><td style="color:var(--t3)">Sin operaciones</td></tr>';
+    tag.textContent='—';return;
+  }
+  // Render síncrono con precios de compra + placeholders "cargando"
+  const paintRow=(label,cells)=>'<tr>'+label+cells.join('')+'</tr>';
+  const paint=(lastPrices)=>{
+    head.innerHTML='<tr><th style="width:200px">Métrica</th>'+tickers.map(tk=>'<th class="num mono" style="font-weight:700">'+tk+'</th>').join('')+'</tr>';
+    const buyCells=tickers.map(tk=>{const v=histAvgBuyPrice(tk);return v==null?'<td class="num" style="color:var(--t3)">—</td>':'<td class="num mono">'+v.toLocaleString('es-AR',{maximumFractionDigits:2})+'</td>';});
+    const nowCells=tickers.map(tk=>{const v=lastPrices?lastPrices[tk]:undefined;if(v===undefined)return '<td class="num" style="color:var(--t3)">cargando…</td>';if(v==null)return '<td class="num" style="color:var(--t3)">—</td>';return '<td class="num mono">'+v.toLocaleString('es-AR',{maximumFractionDigits:2})+'</td>';});
+    const varCells=tickers.map(tk=>{
+      const buy=histAvgBuyPrice(tk);const now=lastPrices?lastPrices[tk]:undefined;
+      if(now===undefined)return '<td class="num" style="color:var(--t3)">—</td>';
+      if(buy==null||now==null||buy===0)return '<td class="num" style="color:var(--t3)">—</td>';
+      const pct=(now/buy-1)*100;
+      const cls=pct>=0?'grn':'rs';
+      const sign=pct>=0?'+':'';
+      return '<td class="num mono '+cls+'" style="font-weight:600">'+sign+pct.toFixed(2)+'%</td>';
+    });
+    body.innerHTML=
+      paintRow('<td style="font-weight:600">Precio compra <span style="color:var(--t3);font-weight:400">(prom. pond.)</span></td>',buyCells)+
+      paintRow('<td style="font-weight:600">Precio hoy</td>',nowCells)+
+      '<tr style="background:var(--card2)">'+paintRow('<td style="font-weight:700">Variación</td>',varCells).replace(/^<tr>|<\/tr>$/g,'')+'</tr>';
+  };
+  const fuentes=tickers.map(tk=>histIsArBond(tk)?'data912':'Yahoo');
+  const unique=[...new Set(fuentes)];
+  tag.textContent=tickers.length+' ticker'+(tickers.length===1?'':'s')+' · fuente: '+unique.join(' + ');
+  paint(null);// pinta compra inmediatamente, "cargando…" en hoy
+  // Fetch precios actuales en segundo plano
+  Promise.all(tickers.map(async tk=>[tk,await histFetchLastPrice(tk)]))
+    .then(entries=>{const lastPrices={};entries.forEach(([tk,v])=>{lastPrices[tk]=v;});paint(lastPrices);})
+    .catch(e=>{console.warn('Fallo al obtener precios actuales:',e);const empty={};tickers.forEach(tk=>{empty[tk]=null;});paint(empty);});
+}
+
 function histRenderOpsTable(){
   const tb=document.getElementById('histOpsBody');
-  if(!histOps.length){tb.innerHTML='<tr><td colspan="6" style="color:var(--t3)">Sin operaciones. Agregá una arriba o restaurá las operaciones precargadas.</td></tr>';
+  if(!histOps.length){tb.innerHTML='<tr><td colspan="7" style="color:var(--t3)">Sin operaciones. Agregá una arriba o restaurá las operaciones precargadas.</td></tr>';
     document.getElementById('histOpsCount').textContent='0 operaciones';return;}
   // Ordenar por fecha descendente
   const sorted=[...histOps].sort((a,b)=>b.date.localeCompare(a.date));
@@ -1566,13 +1660,12 @@ function histRenderOpsTable(){
     const emoji=op.tipo==='compra'?'<span class="grn">▲ Compra</span>':'<span class="rs">▼ Venta</span>';
     const src=histTickerSource(op.ticker);
     const srcLabel=src==='data912'?'<span class="acc">data912</span>':'Yahoo';
-    const precioLabel=op.precio?('<span class="mono">'+op.precio+'</span>'):'<span style="color:var(--t3)">—</span>';
-    return '<tr><td class="mono">'+op.date+'</td><td class="mono" style="font-weight:700">'+op.ticker+'</td><td>'+emoji+'</td><td>'+precioLabel+'</td><td>'+srcLabel+'</td><td><button class="rbtn" style="padding:4px 10px;font-size:11px" onclick="histRemoveOp('+idx+')">✕</button></td></tr>';
+    return '<tr><td class="mono">'+op.date+'</td><td class="mono" style="font-weight:700">'+op.ticker+'</td><td>'+emoji+'</td><td>'+histFmtPrecio(op.precio)+'</td><td>'+histFmtPeso(op.peso)+'</td><td>'+srcLabel+'</td><td><button class="rbtn" style="padding:4px 10px;font-size:11px" onclick="histRemoveOp('+idx+')">✕</button></td></tr>';
   }).join('');
   document.getElementById('histOpsCount').textContent=histOps.length+' operación'+(histOps.length===1?'':'es');
 }
 
-function histRemoveOp(i){histOps.splice(i,1);histSaveOps();histRenderOpsTable();histRenderChart();}
+function histRemoveOp(i){histOps.splice(i,1);histSaveOps();histRenderOpsTable();histRenderPivot();histRenderChart();}
 
 async function loadHistorico(){
   if(!histLoaded){
@@ -1586,15 +1679,18 @@ async function loadHistorico(){
       const date=document.getElementById('histFecha').value;
       const tipo=document.getElementById('histTipo').value;
       const precioRaw=document.getElementById('histPrecio').value;
+      const pesoRaw=document.getElementById('histPeso').value;
       if(!tk||!date){alert('Faltan ticker o fecha');return;}
       const op={date,ticker:tk,tipo};
       if(precioRaw)op.precio=parseFloat(precioRaw);
+      if(pesoRaw)op.peso=parseFloat(pesoRaw);
       histOps.push(op);histSaveOps();
       document.getElementById('histTicker').value='';
       document.getElementById('histPrecio').value='';
+      document.getElementById('histPeso').value='';
       // Invalidar caché para ese ticker (para que recargue si cambió el período)
       Object.keys(_histCache).forEach(k=>{if(k.startsWith(tk+'|'))delete _histCache[k];});
-      histRenderOpsTable();histRenderChart();
+      histRenderOpsTable();histRenderPivot();histRenderChart();
     });
     document.getElementById('histReload').addEventListener('click',()=>{
       // Invalidar todo el caché al cambiar período
@@ -1604,15 +1700,18 @@ async function loadHistorico(){
     document.getElementById('histResetOps').addEventListener('click',()=>{
       if(!confirm('Esto va a reemplazar tus operaciones por las operaciones precargadas. ¿Continuar?'))return;
       histOps=HIST_DEFAULT_OPS.map(o=>Object.assign({},o));
-      histSaveOps();histRenderOpsTable();histRenderChart();
+      // Invalidar caché de precios actuales también
+      Object.keys(_histLastPrice).forEach(k=>delete _histLastPrice[k]);
+      histSaveOps();histRenderOpsTable();histRenderPivot();histRenderChart();
     });
     document.getElementById('histClearAll').addEventListener('click',()=>{
       if(!confirm('Esto va a borrar TODAS las operaciones. ¿Continuar?'))return;
-      histOps=[];histSaveOps();histRenderOpsTable();histRenderChart();
+      histOps=[];histSaveOps();histRenderOpsTable();histRenderPivot();histRenderChart();
     });
     histLoaded=true;
   }
   histRenderOpsTable();
+  histRenderPivot();
   await histRenderChart();
 }
 
