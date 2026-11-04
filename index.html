@@ -408,8 +408,8 @@ Las operaciones se guardan en tu navegador (localStorage) y no se publican al re
 <div class="tbl-wrap"><table class="tbl" id="histPivotTbl"><thead id="histPivotHead"></thead><tbody id="histPivotBody"></tbody></table></div>
 <p style="font-size:11px;color:var(--t3);margin-top:8px;font-family:var(--fm)">
 Valor de compra = promedio ponderado por <code>peso</code> de todas las compras del ticker (precio por lámina de 100 VN para bonos AR).
-Valor hoy = último cierre disponible desde data912 (bonos) o Yahoo (resto).
-Variación = (hoy / compra − 1) × 100.
+Valor hoy = último cierre disponible desde data912 (bonos soberanos USD) → Yahoo (acciones/ETFs) → Stooq (fallback). Variación = (hoy / compra − 1) × 100.<br>
+<strong>Precios manuales</strong>: podés hacer click en cualquier celda de "Precio hoy" para cargar un valor manual (útil para bonos CER como TXMD9 que ninguna API expone). El valor se guarda en localStorage y se marca con ✏️.
 </p>
 <div class="sec">📋 Libro de operaciones <span class="sec-tag" id="histOpsCount">0 operaciones</span></div>
 <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Fecha</th><th>Ticker</th><th>Tipo</th><th>Precio</th><th>Peso</th><th>Fuente</th><th></th></tr></thead><tbody id="histOpsBody"></tbody></table></div>
@@ -1596,50 +1596,100 @@ async function histRenderChart(){
 function histFmtPrecio(v){if(v==null)return '<span style="color:var(--t3)">—</span>';return '<span class="mono">'+Number(v).toLocaleString('es-AR',{maximumFractionDigits:4})+'</span>';}
 function histFmtPeso(v){if(v==null)return '<span style="color:var(--t3)">—</span>';return '<span class="mono">'+(Number(v)*100).toFixed(2)+'%</span>';}
 
+// Precio manual persistido en localStorage para tickers que ninguna fuente trae (ej. TXMD9 CER)
+const HIST_MANUAL_KEY='argmacro_hist_manual_v1';
+function histLoadManualPrices(){try{return JSON.parse(localStorage.getItem(HIST_MANUAL_KEY)||'{}')||{};}catch(e){return{};}}
+function histSaveManualPrice(tk,price){
+  const m=histLoadManualPrices();
+  if(price==null||isNaN(price))delete m[tk.toUpperCase()];
+  else m[tk.toUpperCase()]={price:Number(price),date:new Date().toISOString().slice(0,10)};
+  try{localStorage.setItem(HIST_MANUAL_KEY,JSON.stringify(m));}catch(e){}
+  // Invalidar caché para que el próximo render use el nuevo valor
+  delete _histLastPrice[tk.toUpperCase()];
+}
+
+// Yahoo via proxy, detectando respuestas vacías o de error
+async function _histTryYahoo(tk){
+  const url='https://query2.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(tk)+'?range=5d&interval=1d';
+  const data=await fetchYF(url);
+  if(data?.chart?.error){console.info('[hist] Yahoo error para '+tk+':',data.chart.error.description||data.chart.error.code);return null;}
+  if(data?.finance?.error){console.info('[hist] Yahoo error para '+tk+':',data.finance.error.description||data.finance.error.code);return null;}
+  const result=data?.chart?.result?.[0];
+  if(!result)return null;
+  let last=result.meta?.regularMarketPrice;
+  if(last==null){
+    const closes=result.indicators?.quote?.[0]?.close||[];
+    last=[...closes].reverse().find(v=>v!=null);
+  }
+  return last!=null?last:null;
+}
+
+// Stooq (fuente gratuita alternativa, devuelve CSV). Soporta ETFs US y mucho más.
+// Ejemplo: https://stooq.com/q/l/?s=ewz.us&f=sd2t2ohlcv&h&e=csv
+async function _histTryStooq(tk){
+  // Stooq usa sufijo .us para tickers de EEUU
+  const sym=tk.includes('.')?tk.toLowerCase():tk.toLowerCase()+'.us';
+  const url='https://stooq.com/q/l/?s='+encodeURIComponent(sym)+'&f=sd2t2ohlcv&h&e=csv';
+  // Stooq no soporta CORS directo, pasamos por proxy
+  for(const p of _proxyOrder()){
+    try{
+      const r=await fetch(PROXIES[p].fn(url));
+      if(!r.ok)continue;
+      const text=await r.text();
+      const lines=text.trim().split('\n');
+      if(lines.length<2)continue;
+      // CSV: Symbol,Date,Time,Open,High,Low,Close,Volume
+      const cols=lines[1].split(',');
+      const close=parseFloat(cols[6]);
+      if(!isNaN(close)&&close>0){_rememberProxy(p);return close;}
+    }catch(e){continue;}
+  }
+  return null;
+}
+
 // Precio actual (último dato) por ticker, con caché por sesión
 const _histLastPrice={};
 async function histFetchLastPrice(tk){
   if(tk in _histLastPrice)return _histLastPrice[tk];
+  const upper=tk.toUpperCase();
+  // Intento 0: precio manual si el usuario cargó uno
+  const manual=histLoadManualPrices()[upper];
+  if(manual&&manual.price){_histLastPrice[upper]=manual.price;return manual.price;}
   try{
-    if(histIsArBond(tk)){
+    if(histIsArBond(upper)){
       // Bonos AR: /live/arg_bonds devuelve [{symbol,c,...}] (bonos soberanos USD)
       const data=await fetchD912('/live/arg_bonds');
-      const row=(data||[]).find(x=>(x.symbol||'').toUpperCase()===tk);
-      _histLastPrice[tk]=row?row.c:null;
-      if(!row)console.info('[hist] '+tk+' no está en /live/arg_bonds');
+      const row=Array.isArray(data)?data.find(x=>(x.symbol||'').toUpperCase()===upper):null;
+      _histLastPrice[upper]=row?row.c:null;
+      if(!row)console.info('[hist] '+upper+' no está en /live/arg_bonds');
     }else{
-      // Para acciones/ETFs: primero API local (yfinance server-side), fallback a Yahoo via proxy
+      // Para acciones/ETFs: cascada API local → Yahoo → Stooq
       let last=null;
       // Intento 1: API local si está disponible
       if(apiServerAvailable===null){try{await checkApiServer();}catch(e){}}
       if(apiServerAvailable){
         try{
-          const data=await fetchLocal('/ticker/'+encodeURIComponent(tk)+'?period=5d');
+          const data=await fetchLocal('/ticker/'+encodeURIComponent(upper)+'?period=5d');
           if(data&&!data.error){
-            // Buscar último precio en el formato que devuelva el server
             last=data.last_price||data.price||data.regularMarketPrice||(data.history&&data.history.length?data.history[data.history.length-1].close:null);
           }
-        }catch(e){console.info('[hist] API local falló para '+tk+':',e.message);}
+        }catch(e){console.info('[hist] API local falló para '+upper+':',e.message);}
       }
       // Intento 2: Yahoo via proxy CORS
       if(last==null){
-        const url='https://query2.finance.yahoo.com/v8/finance/chart/'+encodeURIComponent(tk)+'?range=5d&interval=1d';
-        const data=await fetchYF(url);
-        const result=data?.chart?.result?.[0];
-        if(result){
-          // Preferir meta.regularMarketPrice (más actualizado), fallback a último close
-          last=result.meta?.regularMarketPrice;
-          if(last==null){
-            const closes=result.indicators?.quote?.[0]?.close||[];
-            last=[...closes].reverse().find(v=>v!=null);
-          }
-        }
+        try{last=await _histTryYahoo(upper);}
+        catch(e){console.info('[hist] Yahoo falló para '+upper+':',e.message);}
       }
-      _histLastPrice[tk]=last!=null?last:null;
-      if(last==null)console.info('[hist] Yahoo no devolvió precio para '+tk);
+      // Intento 3: Stooq (fallback)
+      if(last==null){
+        try{last=await _histTryStooq(upper);if(last!=null)console.info('[hist] Stooq respondió para '+upper+':',last);}
+        catch(e){console.info('[hist] Stooq falló para '+upper+':',e.message);}
+      }
+      _histLastPrice[upper]=last!=null?last:null;
+      if(last==null)console.info('[hist] Ninguna fuente devolvió precio para '+upper+'. Podés cargarlo manual con histSaveManualPrice("'+upper+'", <precio>).');
     }
-  }catch(e){console.warn('[hist] Error al obtener precio actual de '+tk+':',e.message||e);_histLastPrice[tk]=null;}
-  return _histLastPrice[tk];
+  }catch(e){console.warn('[hist] Error al obtener precio actual de '+upper+':',e.message||e);_histLastPrice[upper]=null;}
+  return _histLastPrice[upper];
 }
 
 // Promedio ponderado de compras por ticker. Si falta peso, cae a promedio simple.
@@ -1672,17 +1722,21 @@ function histRenderPivot(){
   const paint=(lastPrices)=>{
     head.innerHTML='<tr><th style="width:200px">Métrica</th>'+tickers.map(tk=>'<th class="num mono" style="font-weight:700">'+tk+'</th>').join('')+'</tr>';
     const buyCells=tickers.map(tk=>{const v=histAvgBuyPrice(tk);return v==null?'<td class="num" style="color:var(--t3)">—</td>':'<td class="num mono">'+v.toLocaleString('es-AR',{maximumFractionDigits:2})+'</td>';});
+    const manualPrices=histLoadManualPrices();
     const nowCells=tickers.map(tk=>{
+      const upper=tk.toUpperCase();
       const v=lastPrices?lastPrices[tk]:undefined;
-      if(v===undefined)return '<td class="num" style="color:var(--t3)">cargando…</td>';
+      const isManual=!!manualPrices[upper];
+      // Click en la celda abre prompt para cargar precio manual
+      const clickAttr='onclick="histPromptManualPrice(\''+upper+'\')" style="cursor:pointer" title="Click para cargar precio manual"';
+      if(v===undefined)return '<td class="num" style="color:var(--t3)" '+clickAttr+'>cargando…</td>';
       if(v==null){
-        // Distinguir entre "no soportado por la fuente" y "falló la consulta"
-        const upper=tk.toUpperCase();
         if(upper==='TXMD9'||upper.startsWith('TX')||upper.startsWith('T2')||upper.startsWith('T3')||upper.startsWith('T4')||upper.startsWith('T5'))
-          return '<td class="num" style="color:var(--t3)" title="Los bonos CER / dual Tesoro no están en /live/arg_bonds de data912">s/d</td>';
-        return '<td class="num" style="color:var(--t3)">—</td>';
+          return '<td class="num" style="color:var(--t3);cursor:pointer" onclick="histPromptManualPrice(\''+upper+'\')" title="Bono CER/dual, no está en data912. Click para cargar precio manual.">s/d ✏️</td>';
+        return '<td class="num" style="color:var(--t3);cursor:pointer" onclick="histPromptManualPrice(\''+upper+'\')" title="Ninguna fuente devolvió precio. Click para cargar manual.">— ✏️</td>';
       }
-      return '<td class="num mono">'+v.toLocaleString('es-AR',{maximumFractionDigits:2})+'</td>';
+      const prefix=isManual?'<span title="Precio manual del '+manualPrices[upper].date+'" style="font-size:10px">✏️ </span>':'';
+      return '<td class="num mono" '+clickAttr+'>'+prefix+v.toLocaleString('es-AR',{maximumFractionDigits:2})+'</td>';
     });
     const varCells=tickers.map(tk=>{
       const buy=histAvgBuyPrice(tk);const now=lastPrices?lastPrices[tk]:undefined;
@@ -1701,8 +1755,22 @@ function histRenderPivot(){
   const fuentes=tickers.map(tk=>histIsArBond(tk)?'data912':'Yahoo');
   const unique=[...new Set(fuentes)];
   tag.textContent=tickers.length+' ticker'+(tickers.length===1?'':'s')+' · fuente: '+unique.join(' + ');
-  paint(null);// pinta compra inmediatamente, "cargando…" en hoy
-  // Fetch precios actuales en segundo plano
+  // Pintar inmediatamente con precios manuales ya guardados (síncrono)
+  const manualPrices=histLoadManualPrices();
+  const initialPrices={};
+  let anyMissing=false;
+  tickers.forEach(tk=>{
+    const up=tk.toUpperCase();
+    if(up in _histLastPrice)initialPrices[tk]=_histLastPrice[up];
+    else if(manualPrices[up])initialPrices[tk]=manualPrices[up].price;
+    else anyMissing=true;
+  });
+  if(anyMissing){
+    // Algunos tickers aún no tienen precio → pintamos los que sí (manuales/cacheados) y "cargando…" en el resto
+    const partial={};tickers.forEach(tk=>{if(tk in initialPrices)partial[tk]=initialPrices[tk];});
+    paint(Object.keys(partial).length?partial:null);
+  }else{paint(initialPrices);}
+  // Fetch precios actuales en segundo plano para los que falten
   Promise.all(tickers.map(async tk=>[tk,await histFetchLastPrice(tk)]))
     .then(entries=>{const lastPrices={};entries.forEach(([tk,v])=>{lastPrices[tk]=v;});paint(lastPrices);})
     .catch(e=>{console.warn('Fallo al obtener precios actuales:',e);const empty={};tickers.forEach(tk=>{empty[tk]=null;});paint(empty);});
@@ -1725,6 +1793,16 @@ function histRenderOpsTable(){
 }
 
 function histRemoveOp(i){histOps.splice(i,1);histSaveOps();histRenderOpsTable();histRenderPivot();histRenderChart();}
+
+function histPromptManualPrice(tk){
+  const current=histLoadManualPrices()[tk];
+  const promptMsg='Precio actual manual para '+tk+(current?' (actual: '+current.price+' del '+current.date+')':'')+'\n\nDejá vacío para borrar el precio manual y volver a usar la fuente automática.';
+  const input=prompt(promptMsg,current?String(current.price):'');
+  if(input===null)return;// cancel
+  if(input.trim()===''){histSaveManualPrice(tk,null);}
+  else{const n=parseFloat(input.replace(',','.'));if(isNaN(n)){alert('Valor inválido');return;}histSaveManualPrice(tk,n);}
+  histRenderPivot();
+}
 
 async function loadHistorico(){
   if(!histLoaded){
